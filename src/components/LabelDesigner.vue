@@ -18,6 +18,7 @@ import {
   findSharedDataSources,
   getElementsUsingDataSource,
   pruneUnusedDataSources,
+  reassignElementToDedicatedDataSource,
   registerNewElement,
   renameDataSource,
   repairBrokenDataSourceReferences,
@@ -55,6 +56,7 @@ const selectedLayoutId = ref('')
 const jsonEditorOpen = ref(false)
 const jsonEditorText = ref('')
 const jsonEditorError = ref('')
+const dataSourceRemovalPrompt = ref(null)
 
 const dataValues = computed(() => {
   if (!template.value) return {}
@@ -77,6 +79,14 @@ const selectedElementSharesDataSource = computed(() => {
   if (!selectedElement.value?.dataSource || !template.value) return false
 
   return countElementsUsingDataSource(template.value, selectedElement.value.dataSource) > 1
+})
+
+const dataSourceRemovalElements = computed(() => {
+  if (!template.value || !dataSourceRemovalPrompt.value) return []
+
+  const ids = new Set(dataSourceRemovalPrompt.value.elementIds)
+
+  return template.value.elements.filter((element) => ids.has(element.id))
 })
 
 const layoutOptions = computed(() => {
@@ -220,6 +230,50 @@ function refreshLocalLayouts() {
 function showStatus(message, type = 'info') {
   statusMessage.value = message
   statusType.value = type
+  dataSourceRemovalPrompt.value = null
+}
+
+function showDataSourceRemovalPrompt(name, users) {
+  statusMessage.value = `"${name}" è ancora usato da ${users.length} elemento/i sul canvas.`
+  statusType.value = 'warn'
+  dataSourceRemovalPrompt.value = {
+    name,
+    elementIds: users.map((element) => element.id),
+  }
+  selectedIds.value = users.map((element) => element.id)
+}
+
+function dismissDataSourceRemovalPrompt() {
+  dataSourceRemovalPrompt.value = null
+  statusMessage.value = ''
+}
+
+function removeElementsByIds(ids) {
+  if (!template.value || ids.length === 0) return
+
+  const idSet = new Set(ids)
+  template.value.elements = template.value.elements.filter((element) => !idSet.has(element.id))
+  repairBrokenDataSourceReferences(template.value)
+  pruneUnusedDataSources(template.value)
+  selectedIds.value = selectedIds.value.filter((id) => !idSet.has(id))
+}
+
+function tryFinalizeDataSourceRemoval(name) {
+  if (!template.value || !name) return false
+
+  const users = getElementsUsingDataSource(template.value, name)
+
+  if (users.length > 0) {
+    showDataSourceRemovalPrompt(name, users)
+    return false
+  }
+
+  template.value = removeDataSource(template.value, name)
+  pruneUnusedDataSources(template.value)
+  dataSourceRemovalPrompt.value = null
+  showStatus(`Data source "${name}" eliminato`, 'success')
+
+  return true
 }
 
 function notifySharedDataSourcesAfterLoad() {
@@ -280,11 +334,14 @@ function addElement(type) {
 
 function removeSelected() {
   if (!template.value || selectedIds.value.length === 0) return
-  const ids = new Set(selectedIds.value)
-  template.value.elements = template.value.elements.filter((el) => !ids.has(el.id))
-  repairBrokenDataSourceReferences(template.value)
-  pruneUnusedDataSources(template.value)
+  removeElementsByIds(selectedIds.value)
   selectedIds.value = []
+
+  if (dataSourceRemovalPrompt.value) {
+    tryFinalizeDataSourceRemoval(dataSourceRemovalPrompt.value.name)
+    return
+  }
+
   showStatus('Elemento/i eliminato/i', 'info')
 }
 
@@ -344,18 +401,49 @@ function handleRemoveDataSource(name) {
   const users = getElementsUsingDataSource(template.value, name)
 
   if (users.length > 0) {
-    const summary = users.map((element) => describeElementForUi(element)).join(', ')
-    showStatus(
-      `"${name}" è ancora usato da: ${summary}. Elimina o scollega gli elementi sul canvas prima di rimuovere il data source.`,
-      'warn'
-    )
-    selectedIds.value = users.map((element) => element.id)
+    showDataSourceRemovalPrompt(name, users)
     return
   }
 
-  template.value = removeDataSource(template.value, name)
-  pruneUnusedDataSources(template.value)
-  showStatus(`Data source "${name}" eliminato`, 'success')
+  tryFinalizeDataSourceRemoval(name)
+}
+
+function handlePromptReassignElement(element) {
+  if (!template.value || !dataSourceRemovalPrompt.value) return
+
+  const targetName = dataSourceRemovalPrompt.value.name
+  reassignElementToDedicatedDataSource(template.value, element, dataValues.value)
+  tryFinalizeDataSourceRemoval(targetName)
+}
+
+function handlePromptDeleteElement(element) {
+  if (!dataSourceRemovalPrompt.value) return
+
+  const targetName = dataSourceRemovalPrompt.value.name
+  removeElementsByIds([element.id])
+  tryFinalizeDataSourceRemoval(targetName)
+}
+
+function handlePromptReassignAll() {
+  if (!template.value || !dataSourceRemovalPrompt.value) return
+
+  const targetName = dataSourceRemovalPrompt.value.name
+  const users = getElementsUsingDataSource(template.value, targetName)
+
+  for (const element of users) {
+    reassignElementToDedicatedDataSource(template.value, element, dataValues.value)
+  }
+
+  tryFinalizeDataSourceRemoval(targetName)
+}
+
+function handlePromptDeleteAll() {
+  if (!template.value || !dataSourceRemovalPrompt.value) return
+
+  const targetName = dataSourceRemovalPrompt.value.name
+  const users = getElementsUsingDataSource(template.value, targetName)
+  removeElementsByIds(users.map((element) => element.id))
+  tryFinalizeDataSourceRemoval(targetName)
 }
 
 function onImageUpload(event) {
@@ -643,7 +731,38 @@ function buildApiExample() {
     </header>
 
     <div v-if="statusMessage" class="status" :class="statusType">
-      {{ statusMessage }}
+      <p class="status-text">{{ statusMessage }}</p>
+
+      <div v-if="dataSourceRemovalPrompt" class="status-removal-panel">
+        <ul class="status-removal-list">
+          <li v-for="element in dataSourceRemovalElements" :key="element.id">
+            <span>{{ describeElementForUi(element) }}</span>
+            <span class="status-removal-actions">
+              <button type="button" class="btn-link" @click="selectElementById(element.id)">
+                Seleziona
+              </button>
+              <button type="button" class="btn-link" @click="handlePromptReassignElement(element)">
+                Scollega
+              </button>
+              <button type="button" class="btn-link warn" @click="handlePromptDeleteElement(element)">
+                Elimina
+              </button>
+            </span>
+          </li>
+        </ul>
+
+        <div class="status-removal-bulk">
+          <button type="button" class="btn ghost compact" @click="handlePromptReassignAll">
+            Scollega tutti ed elimina campo
+          </button>
+          <button type="button" class="btn ghost compact danger-text" @click="handlePromptDeleteAll">
+            Elimina elementi ed elimina campo
+          </button>
+          <button type="button" class="btn ghost compact" @click="dismissDataSourceRemovalPrompt">
+            Annulla
+          </button>
+        </div>
+      </div>
     </div>
 
     <main v-if="template" class="workspace">
@@ -1048,6 +1167,49 @@ function buildApiExample() {
   flex-shrink: 0;
   padding: 0.4rem 1.25rem;
   font-size: 0.88rem;
+}
+
+.status-text {
+  margin: 0;
+}
+
+.status-removal-panel {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.status-removal-list {
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.status-removal-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.status-removal-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.status-removal-bulk {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.btn.compact {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
 }
 
 .status.success {

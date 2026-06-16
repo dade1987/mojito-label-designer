@@ -10,6 +10,7 @@ import {
   pruneUnusedDataSources,
   registerNewElement,
   renameDataSource,
+  reassignElementToDedicatedDataSource,
   repairBrokenDataSourceReferences,
   resolveElementValue,
   updateElementTextValue,
@@ -214,6 +215,21 @@ describe('templateStore', () => {
     expect(renameDataSource(template, 'text_1', 'codice')).toEqual({ ok: true, name: 'codice' })
     expect(template.dataSources[0].name).toBe('codice')
     expect(template.elements[0].dataSource).toBe('codice')
+  })
+
+  it('reassignElementToDedicatedDataSource crea sempre un nuovo campo', () => {
+    const template = {
+      dataSources: [{ name: 'text_7', label: 'Testo 7', defaultValue: 'Solo' }],
+      elements: [{ id: 't', type: 'text', dataSource: 'text_7' }],
+    }
+
+    const nextName = reassignElementToDedicatedDataSource(template, template.elements[0], {
+      text_7: 'Solo',
+    })
+
+    expect(nextName).toBe('text_1')
+    expect(template.elements[0].dataSource).toBe('text_1')
+    expect(template.dataSources.find((source) => source.name === 'text_1')?.defaultValue).toBe('Solo')
   })
 
   it('repairBrokenDataSourceReferences ricrea data source mancanti', () => {

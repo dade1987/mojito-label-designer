@@ -148,18 +148,12 @@ export function describeElementForUi(element) {
   return `${typeLabel} (${element.x ?? 0}, ${element.y ?? 0})`
 }
 
-export function disconnectElementFromSharedDataSource(
+export function reassignElementToDedicatedDataSource(
   template,
   element,
   dataValues = {},
   overrideValue = undefined
 ) {
-  const sourceName = element.dataSource ?? ''
-
-  if (!sourceName || countElementsUsingDataSource(template, sourceName) <= 1) {
-    return false
-  }
-
   const currentValue =
     overrideValue !== undefined
       ? String(overrideValue)
@@ -184,6 +178,23 @@ export function disconnectElementFromSharedDataSource(
   if ('staticValue' in element) {
     delete element.staticValue
   }
+
+  return name
+}
+
+export function disconnectElementFromSharedDataSource(
+  template,
+  element,
+  dataValues = {},
+  overrideValue = undefined
+) {
+  const sourceName = element.dataSource ?? ''
+
+  if (!sourceName || countElementsUsingDataSource(template, sourceName) <= 1) {
+    return false
+  }
+
+  reassignElementToDedicatedDataSource(template, element, dataValues, overrideValue)
 
   return true
 }
