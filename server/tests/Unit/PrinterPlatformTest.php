@@ -48,6 +48,30 @@ final class PrinterPlatformTest extends TestCase
         );
     }
 
+    public function test_parse_wmic_table_output(): void
+    {
+        $this->assertSame(
+            ['Citizen CL-S703', 'Microsoft Print to PDF'],
+            PrinterPlatform::parseWmicTableOutput([
+                'Name',
+                '',
+                'Citizen CL-S703  ',
+                'Microsoft Print to PDF',
+            ])
+        );
+    }
+
+    public function test_parse_registry_printer_output(): void
+    {
+        $this->assertSame(
+            ['Citizen CL-S703', 'Microsoft Print to PDF'],
+            PrinterPlatform::parseRegistryPrinterOutput([
+                'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Print\\Printers\\Citizen CL-S703',
+                'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Print\\Printers\\Microsoft Print to PDF',
+            ])
+        );
+    }
+
     public function test_parse_wmic_printer_output(): void
     {
         $this->assertSame(
@@ -58,6 +82,13 @@ final class PrinterPlatformTest extends TestCase
                 'Name=PDF Printer',
             ])
         );
+    }
+
+    public function test_windows_powershell_executable_prefers_system_path(): void
+    {
+        $path = PrinterPlatform::windowsPowerShellExecutable();
+        $this->assertNotSame('', $path);
+        $this->assertStringContainsString('powershell', strtolower($path));
     }
 
     public function test_list_returns_empty_when_no_printers_found(): void

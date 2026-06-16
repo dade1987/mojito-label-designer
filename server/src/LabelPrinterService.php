@@ -43,10 +43,17 @@ final class LabelPrinterService
      */
     public function listPrintersInfo(): array
     {
-        return [
-            'printers' => $this->listPrinters(),
+        $printers = $this->listPrinters();
+        $info = [
+            'printers' => $printers,
             'platform' => PrinterPlatform::osFamily(),
         ];
+
+        if ($printers === [] || filter_var(getenv('MOJITO_PRINTER_DEBUG'), FILTER_VALIDATE_BOOL)) {
+            $info['diagnostics'] = PrinterPlatform::lastDiagnostics();
+        }
+
+        return $info;
     }
 
     /**

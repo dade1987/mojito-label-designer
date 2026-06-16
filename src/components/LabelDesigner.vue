@@ -66,7 +66,7 @@ const layoutOptions = computed(() => {
 
 onMounted(async () => {
   try {
-    const [{ printers: list, platform }, defaultTemplate, { templates }] = await Promise.all([
+    const [{ printers: list, platform, diagnostics }, defaultTemplate, { templates }] = await Promise.all([
       fetchPrinters(),
       fetchDefaultTemplate(),
       fetchTemplates().catch(() => ({ templates: [] })),
@@ -75,8 +75,9 @@ onMounted(async () => {
     printerPlatform.value = platform ?? ''
     selectedPrinter.value = pickDefaultPrinter(printers.value)
     if (printers.value.length === 0) {
+      const hint = formatPrinterDiagnostics({ diagnostics })
       showStatus(
-        `Nessuna stampante rilevata (${printerPlatform.value || 'sistema sconosciuto'}). Inserisci il nome manualmente.`,
+        `Nessuna stampante rilevata (${printerPlatform.value || 'sistema sconosciuto'}). Inserisci il nome manualmente.${hint}`,
         'warn'
       )
     }
@@ -101,6 +102,14 @@ function pickDefaultPrinter(list) {
   if (!list.length) return ''
   const citizen = list.find((name) => /citizen/i.test(name))
   return citizen ?? list[0]
+}
+
+function formatPrinterDiagnostics(payload) {
+  const entries = payload?.diagnostics
+  if (!Array.isArray(entries) || entries.length === 0) return ''
+  const first = entries[0]
+  if (!first?.method) return ''
+  return ` Dettaglio: ${first.method} → ${first.output}`
 }
 
 function ensurePrinterSelected() {
