@@ -25,7 +25,7 @@ export function createElement(type, x = 40, y = 40) {
       font: '0',
       fontHeight: 30,
       fontWidth: 30,
-      dataSource: 'title',
+      dataSource: '',
       prefix: '',
       suffix: '',
       bold: false,
@@ -39,7 +39,7 @@ export function createElement(type, x = 40, y = 40) {
       moduleWidth: 2,
       height: 100,
       showText: true,
-      dataSource: 'barcode',
+      dataSource: '',
     }
   }
 
@@ -80,11 +80,94 @@ export function buildValuesFromSources(dataSources) {
   )
 }
 
+export function uniqueDataSourceName(template, base = 'text') {
+  const existing = new Set((template.dataSources ?? []).map((source) => source.name))
+  let index = 1
+  let name = `${base}_${index}`
+
+  while (existing.has(name)) {
+    index += 1
+    name = `${base}_${index}`
+  }
+
+  return name
+}
+
+export function countElementsUsingDataSource(template, dataSourceName) {
+  if (!dataSourceName) {
+    return 0
+  }
+
+  return (template.elements ?? []).filter(
+    (element) =>
+      (element.type === 'text' || element.type === 'barcode') &&
+      element.dataSource === dataSourceName
+  ).length
+}
+
+export function ensureElementDataSource(template, element) {
+  if (element.type !== 'text' && element.type !== 'barcode') {
+    return element.dataSource ?? ''
+  }
+
+  const base = element.type === 'text' ? 'text' : 'barcode'
+  const labelPrefix = element.type === 'text' ? 'Testo' : 'Barcode'
+  const current = element.dataSource ?? ''
+  const needsDedicatedSource =
+    current === '' ||
+    countElementsUsingDataSource(template, current) > 0 ||
+    !(template.dataSources ?? []).some((source) => source.name === current)
+
+  if (!needsDedicatedSource) {
+    return current
+  }
+
+  const name = uniqueDataSourceName(template, base)
+  const labelNumber =
+    (template.dataSources ?? []).filter((source) => source.name.startsWith(`${base}_`)).length + 1
+
+  if (!template.dataSources) {
+    template.dataSources = []
+  }
+
+  template.dataSources.push({
+    name,
+    label: `${labelPrefix} ${labelNumber}`,
+    defaultValue: '',
+  })
+  element.dataSource = name
+
+  return name
+}
+
+export function registerNewElement(template, element) {
+  ensureElementDataSource(template, element)
+  template.elements.push(element)
+
+  return element
+}
+
 export function updateElementTextValue(template, element, value) {
   const nextValue = String(value ?? '')
+  const sourceName = element.dataSource ?? ''
 
-  if (element.dataSource) {
-    const source = template.dataSources.find((item) => item.name === element.dataSource)
+  if (sourceName && countElementsUsingDataSource(template, sourceName) > 1) {
+    const newName = uniqueDataSourceName(template, 'text')
+    const labelNumber =
+      (template.dataSources ?? []).filter((source) => source.name.startsWith('text_')).length + 1
+
+    template.dataSources.push({
+      name: newName,
+      label: `Testo ${labelNumber}`,
+      defaultValue: nextValue,
+    })
+    element.dataSource = newName
+
+    return
+  }
+
+  if (sourceName) {
+    const source = template.dataSources.find((item) => item.name === sourceName)
 
     if (source) {
       source.defaultValue = nextValue

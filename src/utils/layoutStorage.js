@@ -1,6 +1,7 @@
 import { cloneTemplateState } from './cloneSerializable.js'
 
 const STORAGE_KEY = 'mojito-layouts'
+export const LAST_LAYOUT_KEY = 'mojito-last-layout-id'
 
 function cloneElements(elements) {
   return cloneTemplateState(elements ?? [])
@@ -48,11 +49,29 @@ export function saveLocalLayout(template) {
   }
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(layouts))
+  rememberActiveLayout('local', layout.id)
   return layout
 }
 
 export function loadLocalLayout(id) {
   return listLocalLayouts().find((item) => item.id === id) ?? null
+}
+
+export function rememberActiveLayout(source, layoutId) {
+  if (!layoutId) return
+  localStorage.setItem(LAST_LAYOUT_KEY, `${source}:${layoutId}`)
+}
+
+export function loadRememberedLayoutId() {
+  const raw = localStorage.getItem(LAST_LAYOUT_KEY)
+  if (!raw || !raw.includes(':')) return null
+
+  const [source, ...rest] = raw.split(':')
+  const layoutId = rest.join(':')
+
+  if (!source || !layoutId) return null
+
+  return { source, layoutId }
 }
 
 export function deleteLocalLayout(id) {

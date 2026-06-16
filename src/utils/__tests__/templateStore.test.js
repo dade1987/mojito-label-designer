@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildValuesFromSources,
+  countElementsUsingDataSource,
   createElement,
   createEmptyTemplate,
+  registerNewElement,
   resolveElementValue,
+  updateElementTextValue,
 } from '../templateStore.js'
 
 describe('templateStore', () => {
@@ -17,7 +20,7 @@ describe('templateStore', () => {
     const positioned = createElement('text', 10, 20)
     expect(positioned.x).toBe(10)
     expect(positioned.y).toBe(20)
-    expect(createElement('text').dataSource).toBe('title')
+    expect(createElement('text').dataSource).toBe('')
     expect(createElement('barcode').barcodeType).toBe('code128')
     expect(createElement('image').width).toBe(80)
     expect(createElement('unknown').type).toBe('unknown')
@@ -101,5 +104,36 @@ describe('templateStore', () => {
       ])
     ).toEqual({ title: 'Test', barcode: '' })
     expect(buildValuesFromSources([{ name: 'x' }])).toEqual({ x: '' })
+  })
+
+  it('registerNewElement assegna data source dedicato per ogni testo', () => {
+    const template = createEmptyTemplate()
+
+    registerNewElement(template, createElement('text', 10, 10))
+    registerNewElement(template, createElement('text', 20, 20))
+
+    expect(template.elements[0].dataSource).toBe('text_1')
+    expect(template.elements[1].dataSource).toBe('text_2')
+    expect(countElementsUsingDataSource(template, 'text_1')).toBe(1)
+  })
+
+  it('updateElementTextValue scollega elementi che condividono data source', () => {
+    const template = {
+      dataSources: [{ name: 'title', label: 'Titolo', defaultValue: 'Condiviso' }],
+      elements: [
+        { id: 'a', type: 'text', dataSource: 'title' },
+        { id: 'b', type: 'text', dataSource: 'title' },
+      ],
+    }
+
+    updateElementTextValue(template, template.elements[1], 'Solo B')
+
+    expect(template.dataSources.find((source) => source.name === 'title')?.defaultValue).toBe(
+      'Condiviso'
+    )
+    expect(template.elements[1].dataSource).toBe('text_1')
+    expect(template.dataSources.find((source) => source.name === 'text_1')?.defaultValue).toBe(
+      'Solo B'
+    )
   })
 })

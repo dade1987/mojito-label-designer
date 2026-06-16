@@ -7,7 +7,9 @@ import {
   isDataSourceInUse,
   listLocalLayouts,
   loadLocalLayout,
+  loadRememberedLayoutId,
   openLayoutFromFile,
+  rememberActiveLayout,
   removeDataSource,
   sanitizeTemplateForSave,
   saveLayoutToFile,
@@ -40,6 +42,7 @@ describe('layoutStorage', () => {
   it('save/load/delete local layout', () => {
     const saved = saveLocalLayout({ id: 'a', name: 'A', elements: [], dataSources: [] })
     expect(saved.id).toBe('a')
+    expect(localStorage.getItem('mojito-last-layout-id')).toBe('local:a')
     expect(listLocalLayouts()).toHaveLength(1)
     expect(loadLocalLayout('a')?.name).toBe('A')
 
@@ -156,6 +159,11 @@ describe('layoutStorage', () => {
         text: async () => JSON.stringify({ id: 'bad' }),
       })
     ).rejects.toThrow('File layout non valido')
+  })
+
+  it('rememberActiveLayout e loadRememberedLayoutId', () => {
+    rememberActiveLayout('server', 'my-layout')
+    expect(loadRememberedLayoutId()).toEqual({ source: 'server', layoutId: 'my-layout' })
   })
 
   it('removeDataSource e isDataSourceInUse', () => {

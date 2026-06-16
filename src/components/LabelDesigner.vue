@@ -9,7 +9,12 @@ import {
   printLabel,
   saveTemplate,
 } from '../utils/api.js'
-import { buildValuesFromSources, createElement, updateElementTextValue } from '../utils/templateStore.js'
+import {
+  buildValuesFromSources,
+  createElement,
+  registerNewElement,
+  updateElementTextValue,
+} from '../utils/templateStore.js'
 import { cloneTemplateState } from '../utils/cloneSerializable.js'
 import {
   deleteLocalLayout,
@@ -19,6 +24,8 @@ import {
   isDataSourceInUse,
   listLocalLayouts,
   loadLocalLayout,
+  loadRememberedLayoutId,
+  rememberActiveLayout,
   removeDataSource,
   saveLocalLayout,
 } from '../utils/layoutStorage.js'
@@ -83,9 +90,11 @@ onMounted(async () => {
         'warn'
       )
     }
-    template.value = hydrateTemplate(defaultTemplate)
     serverLayouts.value = templates
     refreshLocalLayouts()
+    const initial = await resolveInitialTemplate(defaultTemplate)
+    template.value = hydrateTemplate(initial.template)
+    selectedLayoutId.value = initial.selectedLayout
     await refreshPreview()
   } catch (error) {
     showStatus(error.message, 'error')
@@ -137,6 +146,40 @@ function hydrateTemplate(raw) {
   }
 }
 
+async function resolveInitialTemplate(defaultTemplate) {
+  const remembered = loadRememberedLayoutId()
+
+  if (!remembered) {
+    return { template: defaultTemplate, selectedLayout: '' }
+  }
+
+  if (remembered.source === 'local') {
+    const loaded = loadLocalLayout(remembered.layoutId)
+
+    if (loaded) {
+      return {
+        template: loaded,
+        selectedLayout: `local:${remembered.layoutId}`,
+      }
+    }
+  }
+
+  if (remembered.source === 'server') {
+    try {
+      const loaded = await fetchTemplate(remembered.layoutId)
+
+      return {
+        template: loaded,
+        selectedLayout: `server:${remembered.layoutId}`,
+      }
+    } catch {
+      // fallback al template di default
+    }
+  }
+
+  return { template: defaultTemplate, selectedLayout: '' }
+}
+
 function refreshLocalLayouts() {
   localLayouts.value = listLocalLayouts()
 }
@@ -149,7 +192,7 @@ function showStatus(message, type = 'info') {
 function addElement(type) {
   if (!template.value) return
   const element = createElement(type, 40, 40 + template.value.elements.length * 40)
-  template.value.elements.push(element)
+  registerNewElement(template.value, element)
   selectedId.value = element.id
 }
 
@@ -283,6 +326,7 @@ async function handleSaveServer() {
   try {
     const result = await saveTemplate(template.value)
     template.value = hydrateTemplate(result.template)
+    rememberActiveLayout('server', result.template.id)
     const { templates } = await fetchTemplates()
     serverLayouts.value = templates
     showStatus(`Layout salvato sul server: ${result.template.name}`, 'success')
@@ -312,14 +356,9 @@ async function handleLoadLayout() {
       throw new Error('Layout non trovato.')
     }
 
-    const currentValues = buildValuesFromSources(template.value.dataSources)
-    template.value = hydrateTemplate({
-      ...loaded,
-      dataSources: (loaded.dataSources ?? []).map((source) => ({
-        ...source,
-        defaultValue: currentValues[source.name] ?? source.defaultValue ?? '',
-      })),
-    })
+    template.value = hydrateTemplate(loaded)
+    rememberActiveLayout(option.source, option.layoutId)
+    selectedLayoutId.value = selectedLayoutId.value || `${option.source}:${option.layoutId}`
     selectedId.value = null
     showStatus(`Layout caricato: ${loaded.name}`, 'success')
   } catch (error) {
