@@ -142,6 +142,33 @@ function parseLayoutFile(parsed, filePath = null) {
   }
 }
 
+export function templateToEditableJson(template) {
+  return JSON.stringify(sanitizeTemplateForSave(template), null, 2)
+}
+
+export function parseLayoutJsonText(text) {
+  const trimmed = text.trim()
+
+  if (trimmed === '') {
+    throw new Error('JSON vuoto.')
+  }
+
+  let parsed
+
+  try {
+    parsed = JSON.parse(trimmed)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'errore di parsing'
+    throw new Error(`JSON non valido: ${message}`)
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Il layout deve essere un oggetto JSON.')
+  }
+
+  return parseLayoutFile(parsed)
+}
+
 export async function importLayoutFromFile(file) {
   const text = await file.text()
   return parseLayoutFile(JSON.parse(text), file.name)

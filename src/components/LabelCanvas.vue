@@ -260,6 +260,7 @@ function textStyle(element) {
   return {
     fontSize: `${Math.max(10, 12 * factor)}px`,
     fontWeight: element.bold ? '700' : '400',
+    textDecoration: element.underline ? 'underline' : 'none',
   }
 }
 
@@ -308,7 +309,7 @@ function displayBarcodeValue(element) {
 
       <div
         v-for="element in template.elements"
-        :key="`${element.id}-${elementDisplayValues[element.id] ?? ''}-${element.bold ? 'b' : 'n'}`"
+        :key="`${element.id}-${elementDisplayValues[element.id] ?? ''}-${element.bold ? 'b' : 'n'}-${element.underline ? 'u' : 'n'}`"
         class="element"
         :class="[element.type, { selected: isSelected(element.id), editing: editingId === element.id }]"
         :style="elementStyle(element)"

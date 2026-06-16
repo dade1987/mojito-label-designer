@@ -9,11 +9,13 @@ import {
   loadLocalLayout,
   loadRememberedLayoutId,
   openLayoutFromFile,
+  parseLayoutJsonText,
   rememberActiveLayout,
   removeDataSource,
   sanitizeTemplateForSave,
   saveLayoutToFile,
   saveLocalLayout,
+  templateToEditableJson,
 } from '../layoutStorage.js'
 
 const STORAGE_KEY = 'mojito-layouts'
@@ -164,6 +166,25 @@ describe('layoutStorage', () => {
   it('rememberActiveLayout e loadRememberedLayoutId', () => {
     rememberActiveLayout('server', 'my-layout')
     expect(loadRememberedLayoutId()).toEqual({ source: 'server', layoutId: 'my-layout' })
+  })
+
+  it('templateToEditableJson e parseLayoutJsonText', () => {
+    const json = templateToEditableJson({
+      id: 'x',
+      name: 'Test',
+      elements: [{ id: '1', type: 'text', x: 0, y: 0 }],
+      dataSources: [{ name: 'title', label: 'Titolo', defaultValue: 'Ciao' }],
+    })
+
+    const parsed = parseLayoutJsonText(json)
+    expect(parsed.name).toBe('Test')
+    expect(parsed.dataSources[0].defaultValue).toBe('Ciao')
+  })
+
+  it('parseLayoutJsonText segnala JSON invalido', () => {
+    expect(() => parseLayoutJsonText('{')).toThrow('JSON non valido')
+    expect(() => parseLayoutJsonText('[]')).toThrow('oggetto JSON')
+    expect(() => parseLayoutJsonText('{"id":"x"}')).toThrow('manca elements')
   })
 
   it('removeDataSource e isDataSourceInUse', () => {

@@ -139,4 +139,16 @@ final class ZplBuilderTest extends TestCase
         $this->assertStringContainsString('^FO10,20^', $zpl);
         $this->assertStringContainsString('^FO11,20^', $zpl);
     }
+
+    public function test_render_text_underline_draws_gb_line(): void
+    {
+        $zpl = $this->builder->renderTemplate([
+            'elements' => [
+                ['type' => 'text', 'x' => 10, 'y' => 20, 'staticValue' => 'LINE', 'fontHeight' => 30, 'underline' => true],
+            ],
+        ]);
+
+        $this->assertStringContainsString('^GB', $zpl);
+        $this->assertStringContainsString('LINE', $zpl);
+    }
 }

@@ -31,6 +31,7 @@ export function createElement(type, x = 0, y = 0) {
       prefix: '',
       suffix: '',
       bold: false,
+      underline: false,
     }
   }
 

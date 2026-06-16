@@ -28,6 +28,8 @@ import {
   rememberActiveLayout,
   removeDataSource,
   saveLocalLayout,
+  templateToEditableJson,
+  parseLayoutJsonText,
 } from '../utils/layoutStorage.js'
 import LabelCanvas from './LabelCanvas.vue'
 
@@ -43,6 +45,9 @@ const isBusy = ref(false)
 const localLayouts = ref([])
 const serverLayouts = ref([])
 const selectedLayoutId = ref('')
+const jsonEditorOpen = ref(false)
+const jsonEditorText = ref('')
+const jsonEditorError = ref('')
 
 const dataValues = computed(() => {
   if (!template.value) return {}
@@ -436,6 +441,39 @@ function handleDeleteLocalLayout() {
   showStatus('Layout locale eliminato', 'info')
 }
 
+function openJsonEditor() {
+  if (!template.value) return
+
+  jsonEditorError.value = ''
+  jsonEditorText.value = templateToEditableJson(template.value)
+  jsonEditorOpen.value = true
+}
+
+function closeJsonEditor() {
+  jsonEditorOpen.value = false
+  jsonEditorError.value = ''
+}
+
+function refreshJsonEditorFromCanvas() {
+  if (!template.value) return
+
+  jsonEditorText.value = templateToEditableJson(template.value)
+  jsonEditorError.value = ''
+}
+
+function applyJsonEditor() {
+  try {
+    const parsed = parseLayoutJsonText(jsonEditorText.value)
+    template.value = hydrateTemplate(parsed)
+    selectedIds.value = []
+    jsonEditorOpen.value = false
+    jsonEditorError.value = ''
+    showStatus('Layout JSON applicato', 'success')
+  } catch (error) {
+    jsonEditorError.value = error.message
+  }
+}
+
 function buildApiExample() {
   if (!template.value) return ''
 
@@ -514,6 +552,7 @@ function buildApiExample() {
             Apri JSON (browser)
             <input type="file" accept="application/json,.json" hidden @change="handleImportLayout" />
           </label>
+          <button type="button" class="btn ghost" @click="openJsonEditor">Editor JSON</button>
         </div>
 
         <label>
@@ -617,6 +656,10 @@ function buildApiExample() {
               <input v-model="selectedElement.bold" type="checkbox" />
               Grassetto
             </label>
+            <label class="checkbox-row">
+              <input v-model="selectedElement.underline" type="checkbox" />
+              Sottolineato
+            </label>
           </template>
 
           <template v-if="selectedElement.type === 'barcode'">
@@ -687,6 +730,43 @@ function buildApiExample() {
     </main>
 
     <div v-else class="loading">Caricamento template...</div>
+
+    <div
+      v-if="jsonEditorOpen"
+      class="json-editor-overlay"
+      @click.self="closeJsonEditor"
+    >
+      <div class="json-editor-dialog" role="dialog" aria-labelledby="json-editor-title">
+        <header class="json-editor-header">
+          <div>
+            <h2 id="json-editor-title">Editor JSON layout</h2>
+            <p class="hint">Modifica a mano il layout. Servono almeno <code>elements</code> e <code>dataSources</code>.</p>
+          </div>
+          <button type="button" class="icon-btn json-editor-close" title="Chiudi" @click="closeJsonEditor">
+            ✕
+          </button>
+        </header>
+
+        <p v-if="jsonEditorError" class="json-editor-error">{{ jsonEditorError }}</p>
+
+        <textarea
+          v-model="jsonEditorText"
+          class="json-editor-textarea"
+          spellcheck="false"
+          autocapitalize="off"
+          autocomplete="off"
+          autocorrect="off"
+        />
+
+        <div class="json-editor-actions">
+          <button type="button" class="btn ghost" @click="refreshJsonEditorFromCanvas">
+            Ricarica da canvas
+          </button>
+          <button type="button" class="btn ghost" @click="closeJsonEditor">Annulla</button>
+          <button type="button" class="btn primary" @click="applyJsonEditor">Applica</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -971,6 +1051,73 @@ function buildApiExample() {
 
 .api-example {
   max-height: 180px;
+}
+
+.json-editor-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.json-editor-dialog {
+  width: min(960px, 100%);
+  max-height: min(90vh, 900px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem 1.25rem;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+
+.json-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.json-editor-header h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+}
+
+.json-editor-close {
+  font-size: 1.1rem;
+}
+
+.json-editor-error {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  background: #fdecea;
+  color: #b3261e;
+  font-size: 0.9rem;
+}
+
+.json-editor-textarea {
+  flex: 1;
+  min-height: 420px;
+  resize: vertical;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  tab-size: 2;
+}
+
+.json-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .loading {

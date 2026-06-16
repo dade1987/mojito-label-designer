@@ -109,16 +109,37 @@ final class ZplBuilder
         $prefix = TypeCaster::string($element['prefix'] ?? '');
         $suffix = TypeCaster::string($element['suffix'] ?? '');
         $bold = TypeCaster::bool($element['bold'] ?? false, false);
+        $underline = TypeCaster::bool($element['underline'] ?? false, false);
 
         $text = $this->escapeFieldData($prefix.$value.$suffix);
 
-        $line = sprintf('^FO%d,%d^A%sN,%d,%d^FD%s^FS', $x, $y, $font, $height, $width, $text);
+        $lines = [sprintf('^FO%d,%d^A%sN,%d,%d^FD%s^FS', $x, $y, $font, $height, $width, $text)];
 
-        if (! $bold) {
-            return $line;
+        if ($bold) {
+            $lines[] = sprintf('^FO%d,%d^A%sN,%d,%d^FD%s^FS', $x + 1, $y, $font, $height, $width, $text);
         }
 
-        return $line."\n".sprintf('^FO%d,%d^A%sN,%d,%d^FD%s^FS', $x + 1, $y, $font, $height, $width, $text);
+        if ($underline) {
+            $lines[] = $this->renderTextUnderline($x, $y, $height, $width, $text);
+        }
+
+        return implode("\n", $lines);
+    }
+
+    private function renderTextUnderline(int $x, int $y, int $fontHeight, int $fontWidth, string $text): string
+    {
+        $underlineWidth = max(20, (int) (strlen($text) * max(1, (int) ($fontWidth * 0.55))));
+        $lineThickness = max(2, (int) round($fontHeight / 10));
+        $underlineY = $y + $fontHeight + max(1, (int) round($fontHeight / 8));
+
+        return sprintf(
+            '^FO%d,%d^GB%d,%d,%d,B,0^FS',
+            $x,
+            $underlineY,
+            $underlineWidth,
+            $lineThickness,
+            $lineThickness
+        );
     }
 
     /**
