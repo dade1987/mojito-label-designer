@@ -223,20 +223,67 @@ export function ensureElementDataSource(template, element) {
   return name
 }
 
-export function pruneOrphanedAutoDataSources(template) {
-  const autoSourcePattern = /^(text|barcode|field)_\d+$/
-
+export function pruneUnusedDataSources(template) {
   if (!template.dataSources) {
     return
   }
 
-  template.dataSources = template.dataSources.filter((source) => {
-    if (!autoSourcePattern.test(source.name)) {
-      return true
+  template.dataSources = template.dataSources.filter(
+    (source) => countElementsUsingDataSource(template, source.name) > 0
+  )
+}
+
+/** @deprecated usa pruneUnusedDataSources */
+export function pruneOrphanedAutoDataSources(template) {
+  pruneUnusedDataSources(template)
+}
+
+export function repairBrokenDataSourceReferences(template) {
+  const known = new Set((template.dataSources ?? []).map((source) => source.name))
+
+  for (const element of template.elements ?? []) {
+    if (element.type !== 'text' && element.type !== 'barcode') {
+      continue
     }
 
-    return countElementsUsingDataSource(template, source.name) > 0
-  })
+    const current = element.dataSource ?? ''
+    if (current && known.has(current)) {
+      continue
+    }
+
+    element.dataSource = ''
+    ensureElementDataSource(template, element)
+    known.add(element.dataSource)
+  }
+}
+
+export function renameDataSource(template, oldName, newName) {
+  const trimmed = String(newName ?? '').trim()
+
+  if (!oldName || !trimmed || oldName === trimmed) {
+    return { ok: false, reason: 'invalid' }
+  }
+
+  const sources = template.dataSources ?? []
+  const source = sources.find((item) => item.name === oldName)
+
+  if (!source) {
+    return { ok: false, reason: 'missing' }
+  }
+
+  if (sources.some((item) => item.name === trimmed && item.name !== oldName)) {
+    return { ok: false, reason: 'duplicate' }
+  }
+
+  source.name = trimmed
+
+  for (const element of template.elements ?? []) {
+    if (element.dataSource === oldName) {
+      element.dataSource = trimmed
+    }
+  }
+
+  return { ok: true, name: trimmed }
 }
 
 export function registerNewElement(template, element, displayValues = {}) {

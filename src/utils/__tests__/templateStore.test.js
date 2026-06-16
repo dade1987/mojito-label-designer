@@ -7,8 +7,10 @@ import {
   describeElementForUi,
   disconnectElementFromSharedDataSource,
   findSharedDataSources,
-  pruneOrphanedAutoDataSources,
+  pruneUnusedDataSources,
   registerNewElement,
+  renameDataSource,
+  repairBrokenDataSourceReferences,
   resolveElementValue,
   updateElementTextValue,
 } from '../templateStore.js'
@@ -188,7 +190,7 @@ describe('templateStore', () => {
     expect(describeElementForUi({ type: 'barcode', x: 0, y: 5 })).toBe('Barcode (0, 5)')
   })
 
-  it('pruneOrphanedAutoDataSources rimuove text_N non usati', () => {
+  it('pruneUnusedDataSources rimuove qualsiasi data source non usato', () => {
     const template = {
       dataSources: [
         { name: 'barcode', defaultValue: '123' },
@@ -198,8 +200,31 @@ describe('templateStore', () => {
       elements: [{ id: 'b', type: 'barcode', dataSource: 'barcode' }],
     }
 
-    pruneOrphanedAutoDataSources(template)
+    pruneUnusedDataSources(template)
 
-    expect(template.dataSources.map((source) => source.name)).toEqual(['barcode', 'title'])
+    expect(template.dataSources.map((source) => source.name)).toEqual(['barcode'])
+  })
+
+  it('renameDataSource aggiorna anche gli elementi collegati', () => {
+    const template = {
+      dataSources: [{ name: 'text_1', defaultValue: 'A' }],
+      elements: [{ id: 't', type: 'text', dataSource: 'text_1' }],
+    }
+
+    expect(renameDataSource(template, 'text_1', 'codice')).toEqual({ ok: true, name: 'codice' })
+    expect(template.dataSources[0].name).toBe('codice')
+    expect(template.elements[0].dataSource).toBe('codice')
+  })
+
+  it('repairBrokenDataSourceReferences ricrea data source mancanti', () => {
+    const template = {
+      dataSources: [{ name: 'title', defaultValue: 'Titolo' }],
+      elements: [{ id: 't', type: 'text', dataSource: 'fantasma' }],
+    }
+
+    repairBrokenDataSourceReferences(template)
+
+    expect(template.elements[0].dataSource).toBe('text_1')
+    expect(template.dataSources.some((source) => source.name === 'text_1')).toBe(true)
   })
 })

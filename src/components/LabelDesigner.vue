@@ -16,8 +16,11 @@ import {
   describeElementForUi,
   disconnectElementFromSharedDataSource,
   findSharedDataSources,
-  pruneOrphanedAutoDataSources,
+  getElementsUsingDataSource,
+  pruneUnusedDataSources,
   registerNewElement,
+  renameDataSource,
+  repairBrokenDataSourceReferences,
   updateElementTextValue,
 } from '../utils/templateStore.js'
 import { cloneTemplateState } from '../utils/cloneSerializable.js'
@@ -26,7 +29,6 @@ import {
   importLayoutFromFile,
   openLayoutFromFile,
   saveLayoutToFile,
-  isDataSourceInUse,
   listLocalLayouts,
   loadLocalLayout,
   loadRememberedLayoutId,
@@ -118,6 +120,7 @@ onMounted(async () => {
     refreshLocalLayouts()
     const initial = await resolveInitialTemplate(defaultTemplate)
     template.value = hydrateTemplate(initial.template)
+    finalizeTemplateState()
     selectedLayoutId.value = initial.selectedLayout
     await refreshPreview()
   } catch (error) {
@@ -168,6 +171,12 @@ function hydrateTemplate(raw) {
     })),
     elements: cloneTemplateState(raw.elements ?? []),
   }
+}
+
+function finalizeTemplateState() {
+  if (!template.value) return
+  repairBrokenDataSourceReferences(template.value)
+  pruneUnusedDataSources(template.value)
 }
 
 async function resolveInitialTemplate(defaultTemplate) {
@@ -273,8 +282,31 @@ function removeSelected() {
   if (!template.value || selectedIds.value.length === 0) return
   const ids = new Set(selectedIds.value)
   template.value.elements = template.value.elements.filter((el) => !ids.has(el.id))
-  pruneOrphanedAutoDataSources(template.value)
+  repairBrokenDataSourceReferences(template.value)
+  pruneUnusedDataSources(template.value)
   selectedIds.value = []
+  showStatus('Elemento/i eliminato/i', 'info')
+}
+
+function rememberDataSourceName(source) {
+  source._renamePrevious = source.name
+}
+
+function handleDataSourceNameBlur(source) {
+  if (!template.value) return
+
+  const previousName = source._renamePrevious ?? source.name
+  const result = renameDataSource(template.value, previousName, source.name)
+
+  if (!result.ok) {
+    if (result.reason === 'duplicate') {
+      source.name = previousName
+      showStatus('Nome già usato da un altro data source.', 'error')
+    }
+    return
+  }
+
+  delete source._renamePrevious
 }
 
 function handleKeydown(event) {
@@ -309,14 +341,21 @@ function addDataSource() {
 function handleRemoveDataSource(name) {
   if (!template.value) return
 
-  if (isDataSourceInUse(template.value, name)) {
-    const confirmed = window.confirm(
-      `Il data source "${name}" è usato da uno o più elementi. Eliminarlo comunque? A ogni elemento verrà assegnato un data source dedicato.`
+  const users = getElementsUsingDataSource(template.value, name)
+
+  if (users.length > 0) {
+    const summary = users.map((element) => describeElementForUi(element)).join(', ')
+    showStatus(
+      `"${name}" è ancora usato da: ${summary}. Elimina o scollega gli elementi sul canvas prima di rimuovere il data source.`,
+      'warn'
     )
-    if (!confirmed) return
+    selectedIds.value = users.map((element) => element.id)
+    return
   }
 
   template.value = removeDataSource(template.value, name)
+  pruneUnusedDataSources(template.value)
+  showStatus(`Data source "${name}" eliminato`, 'success')
 }
 
 function onImageUpload(event) {
@@ -432,6 +471,7 @@ async function handleLoadLayout() {
     }
 
     template.value = hydrateTemplate(loaded)
+    finalizeTemplateState()
     rememberActiveLayout(option.source, option.layoutId)
     selectedLayoutId.value = selectedLayoutId.value || `${option.source}:${option.layoutId}`
     selectedIds.value = []
@@ -471,6 +511,7 @@ async function handleOpenFromFile() {
     }
 
     template.value = hydrateTemplate(opened)
+    finalizeTemplateState()
     selectedIds.value = []
     showStatus(
       opened.filePath ? `Layout aperto: ${opened.filePath}` : `Layout aperto: ${opened.name}`,
@@ -489,6 +530,7 @@ async function handleImportLayout(event) {
   try {
     const imported = await importLayoutFromFile(file)
     template.value = hydrateTemplate(imported)
+    finalizeTemplateState()
     selectedIds.value = []
     showStatus(`Layout importato: ${imported.name}`, 'success')
     notifySharedDataSourcesAfterLoad()
@@ -534,6 +576,7 @@ function applyJsonEditor() {
   try {
     const parsed = parseLayoutJsonText(jsonEditorText.value)
     template.value = hydrateTemplate(parsed)
+    finalizeTemplateState()
     selectedIds.value = []
     jsonEditorOpen.value = false
     jsonEditorError.value = ''
@@ -694,13 +737,13 @@ function buildApiExample() {
               <button
                 type="button"
                 class="icon-btn"
-                title="Elimina data source"
+                :title="countElementsUsingDataSource(template, source.name) > 0 ? 'In uso: elimina prima gli elementi sul canvas' : 'Elimina data source'"
                 @click="handleRemoveDataSource(source.name)"
               >
                 ✕
               </button>
             </div>
-            <input v-model="source.name" type="text" placeholder="nome_variabile" />
+            <input v-model="source.name" type="text" placeholder="nome_variabile" @focus="rememberDataSourceName(source)" @blur="handleDataSourceNameBlur(source)" />
             <input v-model="source.defaultValue" type="text" placeholder="Valore di test" />
           </div>
           <button type="button" class="btn ghost" @click="addDataSource">+ Data source</button>
