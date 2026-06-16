@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+server/vendor/
+server/storage/phpstan/
+server/storage/infection/
+server/storage/templates/*.json
+server/.phpunit.result.cache
+coverage/
+.stryker-tmp/
+report/
+*.log
+.DS_Store

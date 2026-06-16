@@ -1,0 +1,49 @@
+{
+  "name": "mojito",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "electron/main.js",
+  "author": {
+    "name": "Mojito",
+    "email": "info@mojito.local"
+  },
+  "description": "POC designer etichette ZPL - Citizen CL-S700",
+  "scripts": {
+    "dev": "vite",
+    "dev:server": "cd server && composer serve",
+    "dev:all": "concurrently \"npm run dev:server\" \"npm run dev\"",
+    "dev:electron": "NODE_ENV=development electron .",
+    "build:renderer": "vite build",
+    "deploy:green-energy": "npm run build:renderer && node scripts/deploy-green-energy.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:server": "cd server && composer test",
+    "test:server:coverage": "cd server && composer test:coverage",
+    "test:all": "npm run test:coverage && npm run test:server:coverage",
+    "analyse:server": "cd server && composer analyse",
+    "pint:server": "cd server && composer pint",
+    "pint:server:fix": "cd server && composer pint:fix",
+    "mutation:server": "cd server && composer mutation",
+    "mutation": "stryker run",
+    "validate:server": "cd server && composer quality",
+    "validate": "npm run test:coverage && npm run validate:server",
+    "validate:full": "npm run validate && npm run mutation:server && npm run mutation",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.5.24"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "^9.5.1",
+    "@stryker-mutator/vitest-runner": "^9.5.1",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "@vitest/coverage-v8": "^2.1.9",
+    "concurrently": "^9.1.2",
+    "electron": "^30.5.1",
+    "jsdom": "^26.0.0",
+    "vite": "^7.2.4",
+    "vitest": "^2.1.9"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/infection/infection/0.32.5/resources/schema.json",
+  "timeout": 10,
+  "threads": 4,
+  "source": {
+    "directories": [
+      "src"
+    ],
+    "excludes": [
+      "vendor",
+      "tests",
+      "storage"
+    ]
+  },
+  "phpUnit": {
+    "customPath": "vendor/bin/phpunit",
+    "configDir": "."
+  },
+  "mutators": {
+    "@default": true
+  },
+  "logs": {
+    "text": "storage/infection/infection.log"
+  },
+  "tmpDir": "storage/infection/tmp",
+  "minMsi": 80,
+  "minCoveredMsi": 80
+}

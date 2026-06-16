@@ -1,0 +1,11 @@
+parameters:
+    level: 9
+    paths:
+        - src
+        - public
+        - bin
+    tmpDir: storage/phpstan
+    excludePaths:
+        - vendor
+        - tests
+        - storage
