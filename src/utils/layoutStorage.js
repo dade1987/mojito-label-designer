@@ -1,4 +1,9 @@
 import { cloneTemplateState } from './cloneSerializable.js'
+import {
+  buildValuesFromSources,
+  ensureElementDataSource,
+  resolveElementValue,
+} from './templateStore.js'
 
 const STORAGE_KEY = 'mojito-layouts'
 export const LAST_LAYOUT_KEY = 'mojito-last-layout-id'
@@ -176,16 +181,30 @@ export async function importLayoutFromFile(file) {
 
 export function removeDataSource(template, name) {
   const next = cloneTemplateState(template)
+  const values = buildValuesFromSources(template.dataSources ?? [])
   next.dataSources = next.dataSources.filter((source) => source.name !== name)
 
-  next.elements = next.elements.map((element) => {
+  for (const element of next.elements) {
     if (element.dataSource !== name) {
-      return element
+      continue
     }
 
-    const fallback = next.dataSources[0]?.name ?? ''
-    return { ...element, dataSource: fallback }
-  })
+    const preservedValue = resolveElementValue(element, values, template.dataSources ?? [])
+    element.dataSource = ''
+
+    if (element.type === 'text' || element.type === 'barcode') {
+      ensureElementDataSource(next, element)
+      const assigned = next.dataSources.find((source) => source.name === element.dataSource)
+
+      if (assigned) {
+        assigned.defaultValue = preservedValue
+      }
+    }
+
+    if ('staticValue' in element) {
+      delete element.staticValue
+    }
+  }
 
   return next
 }

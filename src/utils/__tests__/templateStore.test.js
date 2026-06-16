@@ -7,6 +7,7 @@ import {
   describeElementForUi,
   disconnectElementFromSharedDataSource,
   findSharedDataSources,
+  pruneOrphanedAutoDataSources,
   registerNewElement,
   resolveElementValue,
   updateElementTextValue,
@@ -185,5 +186,20 @@ describe('templateStore', () => {
   it('describeElementForUi', () => {
     expect(describeElementForUi({ type: 'text', x: 10, y: 20 })).toBe('Testo (10, 20)')
     expect(describeElementForUi({ type: 'barcode', x: 0, y: 5 })).toBe('Barcode (0, 5)')
+  })
+
+  it('pruneOrphanedAutoDataSources rimuove text_N non usati', () => {
+    const template = {
+      dataSources: [
+        { name: 'barcode', defaultValue: '123' },
+        { name: 'text_1', defaultValue: 'Orfano' },
+        { name: 'title', defaultValue: 'Titolo' },
+      ],
+      elements: [{ id: 'b', type: 'barcode', dataSource: 'barcode' }],
+    }
+
+    pruneOrphanedAutoDataSources(template)
+
+    expect(template.dataSources.map((source) => source.name)).toEqual(['barcode', 'title'])
   })
 })

@@ -16,6 +16,7 @@ import {
   describeElementForUi,
   disconnectElementFromSharedDataSource,
   findSharedDataSources,
+  pruneOrphanedAutoDataSources,
   registerNewElement,
   updateElementTextValue,
 } from '../utils/templateStore.js'
@@ -272,6 +273,7 @@ function removeSelected() {
   if (!template.value || selectedIds.value.length === 0) return
   const ids = new Set(selectedIds.value)
   template.value.elements = template.value.elements.filter((el) => !ids.has(el.id))
+  pruneOrphanedAutoDataSources(template.value)
   selectedIds.value = []
 }
 
@@ -309,7 +311,7 @@ function handleRemoveDataSource(name) {
 
   if (isDataSourceInUse(template.value, name)) {
     const confirmed = window.confirm(
-      `Il data source "${name}" è usato da uno o più elementi. Eliminarlo comunque? Gli elementi verranno riassegnati al primo data source disponibile.`
+      `Il data source "${name}" è usato da uno o più elementi. Eliminarlo comunque? A ogni elemento verrà assegnato un data source dedicato.`
     )
     if (!confirmed) return
   }
@@ -603,6 +605,7 @@ function buildApiExample() {
 
     <main v-if="template" class="workspace">
       <aside class="panel left">
+        <div class="panel-scroll">
         <h2>Layout</h2>
         <label>
           Nome layout
@@ -702,6 +705,7 @@ function buildApiExample() {
           </div>
           <button type="button" class="btn ghost" @click="addDataSource">+ Data source</button>
         </div>
+        </div>
       </aside>
 
       <section class="canvas-area">
@@ -714,6 +718,7 @@ function buildApiExample() {
       </section>
 
       <aside class="panel right">
+        <div class="panel-scroll">
         <h2>Proprietà</h2>
         <div v-if="selectedCount > 1" class="properties">
           <p class="hint">{{ selectedCount }} elementi selezionati</p>
@@ -849,12 +854,17 @@ function buildApiExample() {
           DPI
           <input v-model.number="template.dpi" type="number" min="150" />
         </label>
+        </div>
 
-        <h2>API esempio</h2>
-        <pre class="zpl-preview api-example">{{ buildApiExample() }}</pre>
-
-        <h2>ZPL Preview</h2>
-        <pre class="zpl-preview">{{ zplPreview }}</pre>
+        <details class="devtools-panel">
+          <summary>API &amp; ZPL</summary>
+          <div class="devtools-body">
+            <p class="devtools-label">API esempio</p>
+            <pre class="zpl-preview api-example">{{ buildApiExample() }}</pre>
+            <p class="devtools-label">ZPL Preview</p>
+            <pre class="zpl-preview">{{ zplPreview }}</pre>
+          </div>
+        </details>
       </aside>
     </main>
 
@@ -901,17 +911,20 @@ function buildApiExample() {
 
 <style scoped>
 .designer {
-  min-height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
 .toolbar {
+  flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: 1rem 1.5rem;
+  padding: 0.65rem 1.25rem;
   background: #16213e;
   color: #fff;
 }
@@ -989,7 +1002,9 @@ function buildApiExample() {
 }
 
 .status {
-  padding: 0.75rem 1.5rem;
+  flex-shrink: 0;
+  padding: 0.4rem 1.25rem;
+  font-size: 0.88rem;
 }
 
 .status.success {
@@ -1033,18 +1048,31 @@ function buildApiExample() {
 
 .workspace {
   flex: 1;
+  min-height: 0;
   display: grid;
-  grid-template-columns: 280px 1fr 320px;
-  gap: 1rem;
-  padding: 1rem;
+  grid-template-columns: 260px minmax(0, 1fr) 290px;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  overflow: hidden;
 }
 
 .panel {
   background: #fff;
   border-radius: 12px;
-  padding: 1rem;
+  padding: 0.75rem;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  overflow: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 0.15rem;
 }
 
 .panel h2 {
@@ -1061,7 +1089,8 @@ function buildApiExample() {
 
 .layout-actions {
   display: grid;
-  gap: 0.5rem;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
   margin-bottom: 0.75rem;
 }
 
@@ -1123,6 +1152,9 @@ function buildApiExample() {
   border: 1px solid #ffcc80;
   border-radius: 8px;
   background: #fff8e1;
+  max-height: 160px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .shared-datasource-alert strong {
@@ -1228,7 +1260,16 @@ function buildApiExample() {
 }
 
 .canvas-area {
-  min-height: 500px;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  padding: 0.75rem;
 }
 
 .properties {
@@ -1258,20 +1299,54 @@ function buildApiExample() {
   font-size: 0.9rem;
 }
 
+.devtools-panel {
+  flex-shrink: 0;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #eee;
+}
+
+.devtools-panel summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #555;
+  user-select: none;
+}
+
+.devtools-body {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  max-height: min(34vh, 280px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.devtools-label {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #666;
+}
+
 .zpl-preview {
   background: #1e1e1e;
   color: #d4d4d4;
   padding: 0.75rem;
   border-radius: 8px;
   font-size: 0.72rem;
-  max-height: 240px;
+  max-height: 120px;
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-all;
+  margin: 0;
 }
 
 .api-example {
-  max-height: 180px;
+  max-height: 100px;
 }
 
 .json-editor-overlay {
@@ -1342,7 +1417,24 @@ function buildApiExample() {
 }
 
 .loading {
-  padding: 2rem;
+  flex: 1;
+  display: grid;
+  place-items: center;
   text-align: center;
+}
+
+@media (max-height: 760px) {
+  .brand p {
+    display: none;
+  }
+
+  .toolbar {
+    padding: 0.45rem 1rem;
+  }
+
+  .panel h2 {
+    margin: 0.65rem 0 0.5rem;
+    font-size: 0.85rem;
+  }
 }
 </style>

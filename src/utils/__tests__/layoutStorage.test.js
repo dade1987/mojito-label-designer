@@ -193,12 +193,20 @@ describe('layoutStorage', () => {
         { name: 'title', defaultValue: 'A' },
         { name: 'barcode', defaultValue: '123' },
       ],
-      elements: [{ dataSource: 'barcode' }, { dataSource: 'title' }],
+      elements: [
+        { type: 'text', dataSource: 'barcode' },
+        { type: 'text', dataSource: 'title' },
+      ],
     })
 
     expect(isDataSourceInUse(template, 'barcode')).toBe(true)
     const next = removeDataSource(template, 'barcode')
-    expect(next.dataSources).toHaveLength(1)
-    expect(next.elements[0].dataSource).toBe('title')
+    expect(next.dataSources).toHaveLength(2)
+    expect(next.dataSources.some((source) => source.name === 'title')).toBe(true)
+    expect(next.elements[0].dataSource).toBe('text_1')
+    expect(next.elements[0].dataSource).not.toBe('barcode')
+    expect(next.elements[0].dataSource).not.toBe('title')
+    expect(next.dataSources.find((source) => source.name === 'text_1')?.defaultValue).toBe('123')
+    expect(next.elements[1].dataSource).toBe('title')
   })
 })

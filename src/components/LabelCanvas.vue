@@ -367,6 +367,8 @@ function displayBarcodeValue(element) {
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
+  width: 100%;
+  min-height: min-content;
 }
 
 .canvas-meta {

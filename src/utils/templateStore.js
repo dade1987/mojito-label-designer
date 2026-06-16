@@ -223,6 +223,22 @@ export function ensureElementDataSource(template, element) {
   return name
 }
 
+export function pruneOrphanedAutoDataSources(template) {
+  const autoSourcePattern = /^(text|barcode|field)_\d+$/
+
+  if (!template.dataSources) {
+    return
+  }
+
+  template.dataSources = template.dataSources.filter((source) => {
+    if (!autoSourcePattern.test(source.name)) {
+      return true
+    }
+
+    return countElementsUsingDataSource(template, source.name) > 0
+  })
+}
+
 export function registerNewElement(template, element, displayValues = {}) {
   ensureElementDataSource(template, element)
   placeNewElement(template, element, displayValues)
