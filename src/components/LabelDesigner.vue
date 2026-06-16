@@ -26,8 +26,9 @@ import LabelCanvas from './LabelCanvas.vue'
 
 const template = ref(null)
 const selectedId = ref(null)
-const printers = ref(['Citizen_CL_S703Z'])
-const selectedPrinter = ref('Citizen_CL_S703Z')
+const printers = ref([])
+const selectedPrinter = ref('')
+const printerPlatform = ref('')
 const zplPreview = ref('')
 const statusMessage = ref('')
 const statusType = ref('info')
@@ -65,15 +66,20 @@ const layoutOptions = computed(() => {
 
 onMounted(async () => {
   try {
-    const [{ printers: list }, defaultTemplate, { templates }] = await Promise.all([
+    const [{ printers: list, platform }, defaultTemplate, { templates }] = await Promise.all([
       fetchPrinters(),
       fetchDefaultTemplate(),
       fetchTemplates().catch(() => ({ templates: [] })),
     ])
-    printers.value = list
-    selectedPrinter.value = list.includes('Citizen_CL_S703Z')
-      ? 'Citizen_CL_S703Z'
-      : list[0]
+    printers.value = Array.isArray(list) ? list : []
+    printerPlatform.value = platform ?? ''
+    selectedPrinter.value = pickDefaultPrinter(printers.value)
+    if (printers.value.length === 0) {
+      showStatus(
+        `Nessuna stampante rilevata (${printerPlatform.value || 'sistema sconosciuto'}). Inserisci il nome manualmente.`,
+        'warn'
+      )
+    }
     template.value = hydrateTemplate(defaultTemplate)
     serverLayouts.value = templates
     refreshLocalLayouts()
@@ -90,6 +96,18 @@ watch(
   },
   { deep: true }
 )
+
+function pickDefaultPrinter(list) {
+  if (!list.length) return ''
+  const citizen = list.find((name) => /citizen/i.test(name))
+  return citizen ?? list[0]
+}
+
+function ensurePrinterSelected() {
+  if (!selectedPrinter.value.trim()) {
+    throw new Error('Seleziona o inserisci il nome di una stampante.')
+  }
+}
 
 function hydrateTemplate(raw) {
   return {
@@ -181,6 +199,7 @@ async function handlePrint() {
   isBusy.value = true
 
   try {
+    ensurePrinterSelected()
     await printLabel({
       template: template.value,
       values: dataValues.value,
@@ -198,6 +217,7 @@ async function handleQuickPrint() {
   isBusy.value = true
 
   try {
+    ensurePrinterSelected()
     await printLabel({
       title: dataValues.value.title ?? 'CAVALLINI SERVICE',
       product: dataValues.value.product ?? 'Test',
@@ -368,19 +388,27 @@ function buildApiExample() {
       </div>
 
       <div class="toolbar-actions">
-        <label>
+        <label class="printer-field">
           Stampante
-          <select v-model="selectedPrinter">
+          <span v-if="printerPlatform" class="platform-tag">{{ printerPlatform }}</span>
+          <select v-if="printers.length" v-model="selectedPrinter">
             <option v-for="printer in printers" :key="printer" :value="printer">
               {{ printer }}
             </option>
           </select>
+          <input
+            v-else
+            v-model="selectedPrinter"
+            type="text"
+            class="printer-input"
+            placeholder="Nome stampante Windows/Linux"
+          />
         </label>
 
-        <button type="button" class="btn secondary" :disabled="isBusy" @click="handleQuickPrint">
+        <button type="button" class="btn secondary" :disabled="isBusy || !selectedPrinter.trim()" @click="handleQuickPrint">
           Stampa rapida
         </button>
-        <button type="button" class="btn primary" :disabled="isBusy" @click="handlePrint">
+        <button type="button" class="btn primary" :disabled="isBusy || !selectedPrinter.trim()" @click="handlePrint">
           Stampa etichetta
         </button>
       </div>
@@ -679,6 +707,30 @@ function buildApiExample() {
 .status.info {
   background: #e3f2fd;
   color: #0d47a1;
+}
+
+.status.warn {
+  background: #fff8e1;
+  color: #f57f17;
+}
+
+.printer-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 220px;
+}
+
+.platform-tag {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.printer-input {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font: inherit;
 }
 
 .workspace {

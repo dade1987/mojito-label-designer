@@ -149,21 +149,36 @@ final class LabelPrinterServiceTest extends TestCase
 
     public function test_list_printers_parses_lpstat_output(): void
     {
-        $runner = new ShellCommandRunner(static fn (): array => [
-            'output' => ['printer Citizen_CL_S703Z is idle.'],
-            'code' => 0,
-        ]);
+        $runner = new ShellCommandRunner(function (string $command): array {
+            if (str_contains($command, 'lpstat -a')) {
+                return ['output' => ['Citizen_CL_S703Z accepting requests since Mon 01 Jan 2024'], 'code' => 0];
+            }
+
+            return ['output' => [], 'code' => 1];
+        });
         $service = new LabelPrinterService(commandRunner: $runner);
 
         $this->assertSame(['Citizen_CL_S703Z'], $service->listPrinters());
     }
 
-    public function test_list_printers_fallback_when_command_fails(): void
+    public function test_list_printers_returns_empty_when_none_found(): void
     {
         $runner = new ShellCommandRunner(static fn (): array => ['output' => [], 'code' => 1]);
         $service = new LabelPrinterService(commandRunner: $runner);
 
-        $this->assertSame(['Citizen_CL_S703Z'], $service->listPrinters());
+        $this->assertSame([], $service->listPrinters());
+    }
+
+    public function test_list_printers_info_includes_platform(): void
+    {
+        $service = new LabelPrinterService(
+            commandRunner: new ShellCommandRunner(static fn (): array => ['output' => [], 'code' => 1]),
+        );
+
+        $info = $service->listPrintersInfo();
+
+        $this->assertSame([], $info['printers']);
+        $this->assertSame(PHP_OS_FAMILY, $info['platform']);
     }
 
     public function test_print_label_uses_build_zpl(): void

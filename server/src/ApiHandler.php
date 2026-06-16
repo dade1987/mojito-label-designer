@@ -22,7 +22,7 @@ final class ApiHandler
         try {
             return match (true) {
                 $method === 'GET' && $path === '/api/health' => $this->ok(['status' => 'ok']),
-                $method === 'GET' && $path === '/api/printers' => $this->ok(['printers' => $this->service->listPrinters()]),
+                $method === 'GET' && $path === '/api/printers' => $this->ok($this->service->listPrintersInfo()),
                 $method === 'GET' && $path === '/api/template/default' => $this->ok($this->defaultTemplate()),
                 $method === 'GET' && $path === '/api/templates' => $this->ok(['templates' => $this->templates->list()]),
                 $method === 'GET' && preg_match('#^/api/templates/([^/]+)$#', $path, $matches) === 1 => $this->ok($this->templates->find($matches[1])),

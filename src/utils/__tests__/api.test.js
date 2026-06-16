@@ -18,11 +18,12 @@ describe('api', () => {
   it('fetchPrinters', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
-      json: async () => ({ printers: ['Citizen_CL_S703Z'] }),
+      json: async () => ({ printers: ['Citizen_CL_S703Z'], platform: 'Windows' }),
     })
 
     const result = await fetchPrinters()
     expect(result.printers).toContain('Citizen_CL_S703Z')
+    expect(result.platform).toBe('Windows')
   })
 
   it('fetchDefaultTemplate e fetchTemplates', async () => {

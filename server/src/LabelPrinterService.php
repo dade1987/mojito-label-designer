@@ -7,19 +7,24 @@ namespace Mojito\Label;
 use RuntimeException;
 
 /**
- * Servizio di stampa etichette ZPL via CUPS (lp -o raw).
- * Compatibile con Citizen CL-S703Z in emulazione ZPL2.
+ * Servizio di stampa etichette ZPL (CUPS su Linux, Winspool RAW su Windows).
+ * Compatibile con Citizen CL-S700 in emulazione ZPL2.
  */
 final class LabelPrinterService
 {
-    public const DEFAULT_PRINTER = 'Citizen_CL_S703Z';
+    /** @deprecated Usare PrinterPlatform::DEFAULT_PRINTER */
+    public const DEFAULT_PRINTER = PrinterPlatform::DEFAULT_PRINTER;
 
     public function __construct(
         private readonly ZplBuilder $zplBuilder = new ZplBuilder,
         private readonly ShellCommandRunner $commandRunner = new ShellCommandRunner,
-        private string $printerName = self::DEFAULT_PRINTER,
+        private string $printerName = '',
         private readonly ?\Closure $tempFileFactory = null,
-    ) {}
+    ) {
+        if ($this->printerName === '') {
+            $this->printerName = PrinterPlatform::defaultPrinterName();
+        }
+    }
 
     public function setPrinterName(string $printerName): self
     {
@@ -31,6 +36,17 @@ final class LabelPrinterService
     public function getPrinterName(): string
     {
         return $this->printerName;
+    }
+
+    /**
+     * @return array{printers: list<string>, platform: string}
+     */
+    public function listPrintersInfo(): array
+    {
+        return [
+            'printers' => $this->listPrinters(),
+            'platform' => PrinterPlatform::osFamily(),
+        ];
     }
 
     /**
@@ -52,6 +68,10 @@ final class LabelPrinterService
 
     public function printZpl(string $zpl): void
     {
+        if (trim($this->printerName) === '') {
+            throw new RuntimeException('Nessuna stampante selezionata.');
+        }
+
         $file = $this->createTempFile();
 
         if ($file === false) {
@@ -63,7 +83,7 @@ final class LabelPrinterService
                 throw new RuntimeException('Impossibile scrivere ZPL nel file temporaneo.');
             }
 
-            $command = 'lp -d '.escapeshellarg($this->printerName).' -o raw '.escapeshellarg($file);
+            $command = PrinterPlatform::buildPrintCommand($this->printerName, $file);
             $result = $this->commandRunner->run($command);
 
             if ($result['code'] !== 0) {
@@ -98,20 +118,6 @@ final class LabelPrinterService
      */
     public function listPrinters(): array
     {
-        $result = $this->commandRunner->run('lpstat -p');
-
-        if ($result['code'] !== 0) {
-            return [self::DEFAULT_PRINTER];
-        }
-
-        $printers = [];
-
-        foreach ($result['output'] as $line) {
-            if (preg_match('/^printer\s+(\S+)/', $line, $matches) === 1) {
-                $printers[] = $matches[1];
-            }
-        }
-
-        return $printers !== [] ? $printers : [self::DEFAULT_PRINTER];
+        return PrinterPlatform::listPrinters($this->commandRunner);
     }
 }

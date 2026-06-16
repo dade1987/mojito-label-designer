@@ -138,6 +138,6 @@ final class ApiHandlerTest extends TestCase
         $handler = new ApiHandler(new LabelPrinterService(commandRunner: $runner), new TemplateRepository($this->tempDir));
 
         $result = $handler->handle('GET', '/api/printers');
-        $this->assertSame(['Citizen_CL_S703Z'], $result['payload']['printers']);
+        $this->assertSame([], $result['payload']['printers']);
     }
 }

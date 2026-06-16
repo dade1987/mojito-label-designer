@@ -41,4 +41,10 @@ for (const entry of await readdir(phpTargetDir)) {
 await cp(phpSourceDir, phpTargetDir, { recursive: true })
 console.log(`Mojito PHP deploy: ${phpSourceDir} -> ${phpTargetDir}`)
 
+const psSource = path.join(rootDir, 'server', 'bin', 'print-raw.ps1')
+const psTargetDir = path.join(greenEnergyRoot, 'lib', 'mojito-label', 'bin')
+await mkdir(psTargetDir, { recursive: true })
+await cp(psSource, path.join(psTargetDir, 'print-raw.ps1'))
+console.log(`Mojito PS1 deploy: ${psSource} -> ${psTargetDir}`)
+
 console.log('Deploy completato. Su GreenEnergyServer esegui: composer dump-autoload -o')
