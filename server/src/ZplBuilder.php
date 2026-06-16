@@ -108,10 +108,17 @@ final class ZplBuilder
         $width = TypeCaster::int($element['fontWidth'] ?? 30, 30);
         $prefix = TypeCaster::string($element['prefix'] ?? '');
         $suffix = TypeCaster::string($element['suffix'] ?? '');
+        $bold = TypeCaster::bool($element['bold'] ?? false, false);
 
         $text = $this->escapeFieldData($prefix.$value.$suffix);
 
-        return sprintf('^FO%d,%d^A%sN,%d,%d^FD%s^FS', $x, $y, $font, $height, $width, $text);
+        $line = sprintf('^FO%d,%d^A%sN,%d,%d^FD%s^FS', $x, $y, $font, $height, $width, $text);
+
+        if (! $bold) {
+            return $line;
+        }
+
+        return $line."\n".sprintf('^FO%d,%d^A%sN,%d,%d^FD%s^FS', $x + 1, $y, $font, $height, $width, $text);
     }
 
     /**

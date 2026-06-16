@@ -18,6 +18,7 @@ export function sanitizeTemplateForSave(template) {
     dataSources: (plain.dataSources ?? []).map((source) => ({
       name: source.name,
       label: source.label ?? source.name,
+      defaultValue: source.defaultValue ?? '',
     })),
     elements: cloneElements(plain.elements),
   }

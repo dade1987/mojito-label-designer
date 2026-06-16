@@ -28,6 +28,7 @@ export function createElement(type, x = 40, y = 40) {
       dataSource: 'title',
       prefix: '',
       suffix: '',
+      bold: false,
     }
   }
 
@@ -77,4 +78,19 @@ export function buildValuesFromSources(dataSources) {
   return Object.fromEntries(
     dataSources.map((source) => [source.name, source.defaultValue ?? ''])
   )
+}
+
+export function updateElementTextValue(template, element, value) {
+  const nextValue = String(value ?? '')
+
+  if (element.dataSource) {
+    const source = template.dataSources.find((item) => item.name === element.dataSource)
+
+    if (source) {
+      source.defaultValue = nextValue
+      return
+    }
+  }
+
+  element.staticValue = nextValue
 }

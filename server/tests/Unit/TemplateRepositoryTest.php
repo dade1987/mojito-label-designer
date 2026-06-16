@@ -39,7 +39,7 @@ final class TemplateRepositoryTest extends TestCase
             'id' => 'test-layout',
             'name' => 'Test Layout',
             'dataSources' => [
-                ['name' => 'barcode', 'label' => 'Barcode'],
+                ['name' => 'barcode', 'label' => 'Barcode', 'defaultValue' => 'ABC123'],
             ],
             'elements' => [
                 ['id' => 'bc', 'type' => 'barcode', 'dataSource' => 'barcode', 'x' => 10, 'y' => 10],
@@ -51,6 +51,7 @@ final class TemplateRepositoryTest extends TestCase
         $this->assertSame('test-layout', $saved['id']);
         $this->assertSame('Test Layout', $loaded['name']);
         $this->assertCount(1, $loaded['elements']);
+        $this->assertSame('ABC123', $loaded['dataSources'][0]['defaultValue']);
     }
 
     public function test_list_skips_invalid_and_unreadable_files(): void

@@ -140,6 +140,7 @@ final class TemplateRepository
                 return [
                     'name' => TypeCaster::string($record['name'] ?? ''),
                     'label' => TypeCaster::string($record['label'] ?? $record['name'] ?? ''),
+                    'defaultValue' => TypeCaster::string($record['defaultValue'] ?? ''),
                 ];
             }, $dataSourcesInput),
             'elements' => $template['elements'],

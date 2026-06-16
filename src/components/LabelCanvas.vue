@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { nextTick, ref, computed } from 'vue'
 import {
   buildElementDisplayValues,
   computeBarcodeBarsStyle,
@@ -8,9 +8,12 @@ import {
   formatBarcodeValue,
   formatDisplayText,
 } from '../utils/canvasDisplay.js'
+import { resolveElementValue } from '../utils/templateStore.js'
 
 const template = defineModel('template', { required: true })
 const selectedId = defineModel('selectedId', { default: null })
+
+const emit = defineEmits(['update-text-value'])
 
 const props = defineProps({
   dataValues: {
@@ -22,6 +25,9 @@ const props = defineProps({
 const canvasRef = ref(null)
 const dragging = ref(null)
 const dragOffset = ref({ x: 0, y: 0 })
+const editingId = ref(null)
+const editValue = ref('')
+const editInputRef = ref(null)
 
 const scale = computed(() => computeScale(template.value.labelWidth))
 
@@ -43,6 +49,8 @@ function selectElement(id) {
 }
 
 function startDrag(event, element) {
+  if (editingId.value === element.id) return
+  if (event.detail > 1) return
   if (!canvasRef.value) return
 
   dragging.value = element
@@ -75,6 +83,40 @@ function stopDrag() {
   window.removeEventListener('mouseup', stopDrag)
 }
 
+async function startTextEdit(event, element) {
+  event.stopPropagation()
+  selectedId.value = element.id
+  editingId.value = element.id
+  editValue.value = resolveElementValue(
+    element,
+    props.dataValues,
+    template.value.dataSources
+  )
+
+  await nextTick()
+  editInputRef.value?.focus()
+  editInputRef.value?.select()
+}
+
+function commitTextEdit(element) {
+  if (editingId.value !== element.id) return
+
+  emit('update-text-value', { element, value: editValue.value })
+  editingId.value = null
+  editValue.value = ''
+}
+
+function cancelTextEdit() {
+  editingId.value = null
+  editValue.value = ''
+}
+
+function setEditInputRef(element, node) {
+  if (editingId.value === element.id) {
+    editInputRef.value = node
+  }
+}
+
 function elementStyle(element) {
   return {
     left: `${element.x * scale.value}px`,
@@ -86,6 +128,7 @@ function textStyle(element) {
   const factor = scale.value * (element.fontHeight ?? 30) / 30
   return {
     fontSize: `${Math.max(10, 12 * factor)}px`,
+    fontWeight: element.bold ? '700' : '400',
   }
 }
 
@@ -128,15 +171,35 @@ function displayBarcodeValue(element) {
     >
       <div
         v-for="element in template.elements"
-        :key="`${element.id}-${elementDisplayValues[element.id] ?? ''}`"
+        :key="`${element.id}-${elementDisplayValues[element.id] ?? ''}-${element.bold ? 'b' : 'n'}`"
         class="element"
-        :class="[element.type, { selected: selectedId === element.id }]"
+        :class="[element.type, { selected: selectedId === element.id, editing: editingId === element.id }]"
         :style="elementStyle(element)"
         @mousedown.prevent="startDrag($event, element)"
         @click.stop="selectElement(element.id)"
       >
         <template v-if="element.type === 'text'">
-          <span :style="textStyle(element)">{{ displayText(element) || '(testo)' }}</span>
+          <input
+            v-if="editingId === element.id"
+            :ref="(node) => setEditInputRef(element, node)"
+            v-model="editValue"
+            class="text-edit-input"
+            :style="textStyle(element)"
+            @mousedown.stop
+            @click.stop
+            @dblclick.stop
+            @blur="commitTextEdit(element)"
+            @keydown.enter.prevent="commitTextEdit(element)"
+            @keydown.esc.prevent="cancelTextEdit"
+          />
+          <span
+            v-else
+            :style="textStyle(element)"
+            title="Doppio clic per modificare"
+            @dblclick.stop.prevent="startTextEdit($event, element)"
+          >
+            {{ displayText(element) || '(testo)' }}
+          </span>
         </template>
 
         <template v-else-if="element.type === 'barcode'">
@@ -195,9 +258,25 @@ function displayBarcodeValue(element) {
   background: rgba(15, 157, 88, 0.08);
 }
 
+.element.editing {
+  border-color: #1a73e8;
+  background: rgba(26, 115, 232, 0.08);
+}
+
 .element.text span {
   white-space: nowrap;
   font-family: monospace;
+  cursor: text;
+}
+
+.text-edit-input {
+  min-width: 4rem;
+  border: 1px solid #1a73e8;
+  border-radius: 4px;
+  padding: 0 4px;
+  font-family: monospace;
+  background: #fff;
+  color: #111;
 }
 
 .barcode {

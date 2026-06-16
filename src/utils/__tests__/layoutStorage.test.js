@@ -23,7 +23,7 @@ describe('layoutStorage', () => {
     vi.restoreAllMocks()
   })
 
-  it('sanitizeTemplateForSave clona proxy Vue e rimuove defaultValue', () => {
+  it('sanitizeTemplateForSave clona proxy Vue e conserva defaultValue', () => {
     const template = reactive({
       id: 't1',
       name: 'Test',
@@ -33,7 +33,7 @@ describe('layoutStorage', () => {
 
     const saved = sanitizeTemplateForSave(template)
 
-    expect(saved.dataSources[0]).toEqual({ name: 'barcode', label: 'Barcode' })
+    expect(saved.dataSources[0]).toEqual({ name: 'barcode', label: 'Barcode', defaultValue: 'ABC' })
     expect(saved.elements[0].imageData).toBe('data:image/png;base64,AA==')
   })
 

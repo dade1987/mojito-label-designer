@@ -126,4 +126,17 @@ final class ZplBuilderTest extends TestCase
         $this->assertStringContainsString('STATIC', $zpl);
         $this->assertStringContainsString('DEF', $zpl);
     }
+
+    public function test_render_text_bold_uses_double_strike(): void
+    {
+        $zpl = $this->builder->renderTemplate([
+            'elements' => [
+                ['type' => 'text', 'x' => 10, 'y' => 20, 'staticValue' => 'BOLD', 'bold' => true],
+            ],
+        ]);
+
+        $this->assertSame(2, substr_count($zpl, 'BOLD'));
+        $this->assertStringContainsString('^FO10,20^', $zpl);
+        $this->assertStringContainsString('^FO11,20^', $zpl);
+    }
 }

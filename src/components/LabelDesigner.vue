@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import {
   fetchDefaultTemplate,
   fetchPrinters,
@@ -9,7 +9,7 @@ import {
   printLabel,
   saveTemplate,
 } from '../utils/api.js'
-import { buildValuesFromSources, createElement } from '../utils/templateStore.js'
+import { buildValuesFromSources, createElement, updateElementTextValue } from '../utils/templateStore.js'
 import { cloneTemplateState } from '../utils/cloneSerializable.js'
 import {
   deleteLocalLayout,
@@ -65,6 +65,8 @@ const layoutOptions = computed(() => {
 })
 
 onMounted(async () => {
+  window.addEventListener('keydown', handleKeydown)
+
   try {
     const [{ printers: list, platform, diagnostics }, defaultTemplate, { templates }] = await Promise.all([
       fetchPrinters(),
@@ -88,6 +90,10 @@ onMounted(async () => {
   } catch (error) {
     showStatus(error.message, 'error')
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
 })
 
 watch(
@@ -151,6 +157,25 @@ function removeSelected() {
   if (!template.value || !selectedId.value) return
   template.value.elements = template.value.elements.filter((el) => el.id !== selectedId.value)
   selectedId.value = null
+}
+
+function handleKeydown(event) {
+  const target = event.target
+  const tag = target?.tagName?.toLowerCase() ?? ''
+
+  if (tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable) {
+    return
+  }
+
+  if (event.key === 'Delete' && selectedId.value) {
+    event.preventDefault()
+    removeSelected()
+  }
+}
+
+function handleUpdateTextValue({ element, value }) {
+  if (!template.value) return
+  updateElementTextValue(template.value, element, value)
 }
 
 function addDataSource() {
@@ -497,6 +522,7 @@ function buildApiExample() {
           v-model:template="template"
           v-model:selected-id="selectedId"
           :data-values="dataValues"
+          @update-text-value="handleUpdateTextValue"
         />
       </section>
 
@@ -536,6 +562,10 @@ function buildApiExample() {
             <label>
               Font width
               <input v-model.number="selectedElement.fontWidth" type="number" min="10" />
+            </label>
+            <label class="checkbox-row">
+              <input v-model="selectedElement.bold" type="checkbox" />
+              Grassetto
             </label>
           </template>
 
@@ -860,6 +890,16 @@ function buildApiExample() {
   display: grid;
   gap: 0.25rem;
   font-size: 0.85rem;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.checkbox-row input[type='checkbox'] {
+  width: auto;
 }
 
 .hint {
