@@ -136,12 +136,13 @@ final class LabelPrinterServiceTest extends TestCase
         $this->assertTrue(true);
     }
 
-    public function test_print_zpl_windows_tries_fallback_methods(): void
+    public function test_print_zpl_windows_uses_optional_print_exe_fallback(): void
     {
         if (PHP_OS_FAMILY !== 'Windows') {
             $this->markTestSkipped('Test specifico Windows.');
         }
 
+        putenv('MOJITO_ALLOW_PRINT_EXE=1');
         $attempt = 0;
         $runner = new ShellCommandRunner(function () use (&$attempt): array {
             $attempt++;
@@ -150,9 +151,13 @@ final class LabelPrinterServiceTest extends TestCase
         });
         $service = new LabelPrinterService(commandRunner: $runner);
 
-        $service->printZpl('^XA^XZ');
-
-        $this->assertSame(2, $attempt);
+        try {
+            $service->printZpl('^XA^XZ');
+            $this->assertSame(2, $attempt);
+            $this->assertSame('print-exe', $service->getLastPrintMethod());
+        } finally {
+            putenv('MOJITO_ALLOW_PRINT_EXE');
+        }
     }
 
     public function test_print_zpl_failure(): void

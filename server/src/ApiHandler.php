@@ -123,10 +123,17 @@ final class ApiHandler
             $this->service->printLabel($body);
         }
 
-        return $this->ok([
+        $payload = [
             'status' => 'printed',
             'printer' => $this->service->getPrinterName(),
-        ]);
+            'method' => $this->service->getLastPrintMethod(),
+        ];
+
+        if (filter_var(getenv('MOJITO_PRINTER_DEBUG'), FILTER_VALIDATE_BOOL)) {
+            $payload['printOutput'] = $this->service->getLastPrintOutput();
+        }
+
+        return $this->ok($payload);
     }
 
     /**

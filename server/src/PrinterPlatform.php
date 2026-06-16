@@ -68,6 +68,7 @@ final class PrinterPlatform
             $preferred,
             is_string($printTemp) ? trim($printTemp) : '',
             is_string($laragonRoot) && $laragonRoot !== '' ? rtrim($laragonRoot, '\\/').'\\tmp' : '',
+            self::detectLaragonTmpFromInstallPath(),
             sys_get_temp_dir(),
         ], static fn (string $dir): bool => $dir !== ''));
 
@@ -100,9 +101,31 @@ final class PrinterPlatform
             .' -FilePath '.escapeshellarg($filePath)
             .' -TempDir '.escapeshellarg($workTemp);
 
-        $printExe = 'print /D:'.escapeshellarg($printerName).' '.escapeshellarg($filePath);
+        $commands = [$rawScript];
 
-        return [$rawScript, $printExe];
+        // print.exe restituisce spesso exit 0 senza stampare ZPL RAW — solo se esplicitamente abilitato.
+        if (filter_var(getenv('MOJITO_ALLOW_PRINT_EXE'), FILTER_VALIDATE_BOOL)) {
+            $commands[] = 'print /D:'.escapeshellarg($printerName).' '.escapeshellarg($filePath);
+        }
+
+        return $commands;
+    }
+
+    public static function detectLaragonTmpFromInstallPath(): string
+    {
+        $script = self::windowsPrintScriptPath();
+
+        if (preg_match('#^(.+[\\\\/]laragon)[\\\\/]#i', $script, $matches) !== 1) {
+            return '';
+        }
+
+        $tmp = rtrim(str_replace('/', '\\', $matches[1]), '\\').'\\tmp';
+
+        if (! is_dir($tmp)) {
+            @mkdir($tmp, 0775, true);
+        }
+
+        return is_dir($tmp) && is_writable($tmp) ? $tmp : '';
     }
 
     public static function defaultPrinterName(): string

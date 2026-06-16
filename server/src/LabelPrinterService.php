@@ -15,6 +15,11 @@ final class LabelPrinterService
     /** @deprecated Usare PrinterPlatform::DEFAULT_PRINTER */
     public const DEFAULT_PRINTER = PrinterPlatform::DEFAULT_PRINTER;
 
+    private string $lastPrintMethod = '';
+
+    /** @var list<string> */
+    private array $lastPrintOutput = [];
+
     public function __construct(
         private readonly ZplBuilder $zplBuilder = new ZplBuilder,
         private readonly ShellCommandRunner $commandRunner = new ShellCommandRunner,
@@ -36,6 +41,19 @@ final class LabelPrinterService
     public function getPrinterName(): string
     {
         return $this->printerName;
+    }
+
+    public function getLastPrintMethod(): string
+    {
+        return $this->lastPrintMethod;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getLastPrintOutput(): array
+    {
+        return $this->lastPrintOutput;
     }
 
     /**
@@ -113,21 +131,27 @@ final class LabelPrinterService
 
     private function runWindowsPrint(string $printerName, string $file, string $tempDir): void
     {
+        $this->lastPrintMethod = '';
+        $this->lastPrintOutput = [];
         $errors = [];
 
         foreach (PrinterPlatform::buildPrintCommands($printerName, $file, $tempDir) as $index => $command) {
             $result = $this->commandRunner->run($command);
+            $method = $index === 0 ? 'raw-script' : 'print-exe';
 
             if ($result['code'] === 0) {
+                $this->lastPrintMethod = $method;
+                $this->lastPrintOutput = $result['output'];
+
                 return;
             }
 
-            $errors[] = 'Metodo #'.($index + 1).': '.implode("\n", $result['output']);
+            $errors[] = $method.': '.implode("\n", $result['output']);
         }
 
         throw new RuntimeException(
             "Errore stampa etichetta (Windows/Laragon).\n"
-            ."Verifica che la stampante esista e prova MOJITO_PRINT_TEMP=C:\\laragon\\tmp\n"
+            ."Verifica MOJITO_PRINT_TEMP=C:\\laragon\\tmp e che Apache Laragon giri come utente corrente.\n"
             .implode("\n---\n", $errors)
         );
     }

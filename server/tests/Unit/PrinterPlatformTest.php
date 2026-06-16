@@ -106,7 +106,13 @@ final class PrinterPlatformTest extends TestCase
             $this->assertStringContainsString('powershell', $commands[0]);
             $this->assertStringContainsString('print-raw.ps1', $commands[0]);
             $this->assertStringContainsString('-TempDir', $commands[0]);
-            $this->assertStringContainsString('print /D:', $commands[1]);
+            $this->assertCount(1, $commands);
+
+            putenv('MOJITO_ALLOW_PRINT_EXE=1');
+            $withFallback = PrinterPlatform::buildPrintCommands('Citizen CL-S703', '/tmp/label.zpl', '/tmp');
+            putenv('MOJITO_ALLOW_PRINT_EXE');
+            $this->assertCount(2, $withFallback);
+            $this->assertStringContainsString('print /D:', $withFallback[1]);
         } else {
             $this->assertStringContainsString('lp -d', $commands[0]);
             $this->assertStringContainsString('-o raw', $commands[0]);
