@@ -100,14 +100,16 @@ final class PrinterPlatformTest extends TestCase
 
     public function test_build_print_command_uses_platform_backend(): void
     {
-        $command = PrinterPlatform::buildPrintCommand('Citizen CL-S703', '/tmp/label.zpl');
+        $commands = PrinterPlatform::buildPrintCommands('Citizen CL-S703', '/tmp/label.zpl', '/tmp');
 
         if (PHP_OS_FAMILY === 'Windows') {
-            $this->assertStringContainsString('powershell', $command);
-            $this->assertStringContainsString('print-raw.ps1', $command);
+            $this->assertStringContainsString('powershell', $commands[0]);
+            $this->assertStringContainsString('print-raw.ps1', $commands[0]);
+            $this->assertStringContainsString('-TempDir', $commands[0]);
+            $this->assertStringContainsString('print /D:', $commands[1]);
         } else {
-            $this->assertStringContainsString('lp -d', $command);
-            $this->assertStringContainsString('-o raw', $command);
+            $this->assertStringContainsString('lp -d', $commands[0]);
+            $this->assertStringContainsString('-o raw', $commands[0]);
         }
     }
 

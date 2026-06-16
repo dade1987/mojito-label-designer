@@ -1,7 +1,8 @@
 # Invia ZPL in modalita RAW a una stampante Windows (Winspool API).
 param(
     [Parameter(Mandatory = $true)][string]$PrinterName,
-    [Parameter(Mandatory = $true)][string]$FilePath
+    [Parameter(Mandatory = $true)][string]$FilePath,
+    [string]$TempDir = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -11,7 +12,16 @@ if (-not (Test-Path -LiteralPath $FilePath)) {
     exit 1
 }
 
-Add-Type -TypeDefinition @"
+$workTemp = if ($TempDir -ne '') { $TempDir } else { Split-Path -Parent $FilePath }
+if (-not (Test-Path -LiteralPath $workTemp)) {
+    New-Item -ItemType Directory -Force -Path $workTemp | Out-Null
+}
+
+$env:TEMP = $workTemp
+$env:TMP = $workTemp
+
+if (-not ("MojitoRawPrinter" -as [type])) {
+    Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
 
@@ -85,6 +95,7 @@ public class MojitoRawPrinter
     }
 }
 "@
+}
 
 $bytes = [System.IO.File]::ReadAllBytes($FilePath)
 

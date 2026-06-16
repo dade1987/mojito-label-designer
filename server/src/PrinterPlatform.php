@@ -41,20 +41,68 @@ final class PrinterPlatform
         return self::$lastDiagnostics;
     }
 
-    public static function buildPrintCommand(string $printerName, string $filePath): string
+    public static function buildPrintCommand(string $printerName, string $filePath, string $tempDir = ''): string
+    {
+        $commands = self::buildPrintCommands($printerName, $filePath, $tempDir);
+
+        return $commands[0];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function buildPrintCommands(string $printerName, string $filePath, string $tempDir = ''): array
     {
         if (self::isWindows()) {
-            $script = self::windowsPrintScriptPath();
-            $powershell = self::windowsPowerShellExecutable();
-
-            return escapeshellarg($powershell)
-                .' -NoProfile -NonInteractive -ExecutionPolicy Bypass -File '
-                .escapeshellarg($script)
-                .' -PrinterName '.escapeshellarg($printerName)
-                .' -FilePath '.escapeshellarg($filePath);
+            return self::buildWindowsPrintCommands($printerName, $filePath, $tempDir);
         }
 
-        return 'lp -d '.escapeshellarg($printerName).' -o raw '.escapeshellarg($filePath);
+        return ['lp -d '.escapeshellarg($printerName).' -o raw '.escapeshellarg($filePath)];
+    }
+
+    public static function writableTempDir(string $preferred = ''): string
+    {
+        $laragonRoot = getenv('LARAGON_ROOT');
+        $printTemp = getenv('MOJITO_PRINT_TEMP');
+        $candidates = array_values(array_filter([
+            $preferred,
+            is_string($printTemp) ? trim($printTemp) : '',
+            is_string($laragonRoot) && $laragonRoot !== '' ? rtrim($laragonRoot, '\\/').'\\tmp' : '',
+            sys_get_temp_dir(),
+        ], static fn (string $dir): bool => $dir !== ''));
+
+        foreach ($candidates as $dir) {
+            if (! is_dir($dir)) {
+                @mkdir($dir, 0775, true);
+            }
+
+            if (is_dir($dir) && is_writable($dir)) {
+                return $dir;
+            }
+        }
+
+        return sys_get_temp_dir();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function buildWindowsPrintCommands(string $printerName, string $filePath, string $tempDir): array
+    {
+        $powershell = self::windowsPowerShellExecutable();
+        $script = self::windowsPrintScriptPath();
+        $workTemp = $tempDir !== '' ? $tempDir : self::writableTempDir(dirname($filePath));
+
+        $rawScript = escapeshellarg($powershell)
+            .' -NoProfile -NonInteractive -ExecutionPolicy Bypass -File '
+            .escapeshellarg($script)
+            .' -PrinterName '.escapeshellarg($printerName)
+            .' -FilePath '.escapeshellarg($filePath)
+            .' -TempDir '.escapeshellarg($workTemp);
+
+        $printExe = 'print /D:'.escapeshellarg($printerName).' '.escapeshellarg($filePath);
+
+        return [$rawScript, $printExe];
     }
 
     public static function defaultPrinterName(): string
@@ -98,7 +146,6 @@ final class PrinterPlatform
     private static function listWindowsPrinters(ShellCommandRunner $runner): array
     {
         $strategies = [
-            'com-wmi' => static fn (): array => self::listWindowsPrintersViaCom(),
             'powershell-win32-printer' => static fn (): array => self::listViaPowerShell(
                 $runner,
                 'Get-CimInstance -ClassName Win32_Printer | Select-Object -ExpandProperty Name'
@@ -135,38 +182,6 @@ final class PrinterPlatform
         }
 
         return [];
-    }
-
-    /**
-     * @return list<string>
-     */
-    private static function listWindowsPrintersViaCom(): array
-    {
-        if (! class_exists('COM')) {
-            self::recordDiagnostic('com-wmi', 127, 'COM extension not available');
-
-            return [];
-        }
-
-        try {
-            $wmi = new \COM('winmgmts:{impersonationLevel=impersonate}!\\\\.\\root\\cimv2');
-            $printers = $wmi->ExecQuery('SELECT Name FROM Win32_Printer');
-            $names = [];
-
-            foreach ($printers as $printer) {
-                $name = trim((string) $printer->Name);
-
-                if ($name !== '') {
-                    $names[] = $name;
-                }
-            }
-
-            return self::uniqueNames($names);
-        } catch (\Throwable $exception) {
-            self::recordDiagnostic('com-wmi', 1, $exception->getMessage());
-
-            return [];
-        }
     }
 
     /**

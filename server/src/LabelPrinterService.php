@@ -85,12 +85,20 @@ final class LabelPrinterService
             throw new RuntimeException('Impossibile creare file temporaneo per la stampa.');
         }
 
+        $tempDir = PrinterPlatform::writableTempDir(dirname($file));
+
         try {
             if (@file_put_contents($file, $zpl) === false) {
                 throw new RuntimeException('Impossibile scrivere ZPL nel file temporaneo.');
             }
 
-            $command = PrinterPlatform::buildPrintCommand($this->printerName, $file);
+            if (PrinterPlatform::isWindows()) {
+                $this->runWindowsPrint($this->printerName, $file, $tempDir);
+
+                return;
+            }
+
+            $command = PrinterPlatform::buildPrintCommand($this->printerName, $file, $tempDir);
             $result = $this->commandRunner->run($command);
 
             if ($result['code'] !== 0) {
@@ -103,13 +111,36 @@ final class LabelPrinterService
         }
     }
 
+    private function runWindowsPrint(string $printerName, string $file, string $tempDir): void
+    {
+        $errors = [];
+
+        foreach (PrinterPlatform::buildPrintCommands($printerName, $file, $tempDir) as $index => $command) {
+            $result = $this->commandRunner->run($command);
+
+            if ($result['code'] === 0) {
+                return;
+            }
+
+            $errors[] = 'Metodo #'.($index + 1).': '.implode("\n", $result['output']);
+        }
+
+        throw new RuntimeException(
+            "Errore stampa etichetta (Windows/Laragon).\n"
+            ."Verifica che la stampante esista e prova MOJITO_PRINT_TEMP=C:\\laragon\\tmp\n"
+            .implode("\n---\n", $errors)
+        );
+    }
+
     private function createTempFile(): string|false
     {
         if ($this->tempFileFactory instanceof \Closure) {
             return ($this->tempFileFactory)();
         }
 
-        return tempnam(sys_get_temp_dir(), 'label_');
+        $dir = PrinterPlatform::writableTempDir();
+
+        return tempnam($dir, 'label_');
     }
 
     /**
