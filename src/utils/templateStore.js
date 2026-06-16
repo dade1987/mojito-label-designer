@@ -101,11 +101,91 @@ export function countElementsUsingDataSource(template, dataSourceName) {
     return 0
   }
 
+  return getElementsUsingDataSource(template, dataSourceName).length
+}
+
+export function getElementsUsingDataSource(template, dataSourceName) {
+  if (!dataSourceName) {
+    return []
+  }
+
   return (template.elements ?? []).filter(
     (element) =>
       (element.type === 'text' || element.type === 'barcode') &&
       element.dataSource === dataSourceName
-  ).length
+  )
+}
+
+export function findSharedDataSources(template) {
+  const groups = new Map()
+
+  for (const element of template.elements ?? []) {
+    if (element.type !== 'text' && element.type !== 'barcode') {
+      continue
+    }
+
+    const name = element.dataSource ?? ''
+    if (!name) {
+      continue
+    }
+
+    if (!groups.has(name)) {
+      groups.set(name, [])
+    }
+
+    groups.get(name).push(element)
+  }
+
+  return [...groups.entries()]
+    .filter(([, elements]) => elements.length > 1)
+    .map(([name, elements]) => ({ name, elements }))
+}
+
+export function describeElementForUi(element) {
+  const typeLabel =
+    element.type === 'text' ? 'Testo' : element.type === 'barcode' ? 'Barcode' : element.type
+
+  return `${typeLabel} (${element.x ?? 0}, ${element.y ?? 0})`
+}
+
+export function disconnectElementFromSharedDataSource(
+  template,
+  element,
+  dataValues = {},
+  overrideValue = undefined
+) {
+  const sourceName = element.dataSource ?? ''
+
+  if (!sourceName || countElementsUsingDataSource(template, sourceName) <= 1) {
+    return false
+  }
+
+  const currentValue =
+    overrideValue !== undefined
+      ? String(overrideValue)
+      : resolveElementValue(element, dataValues, template.dataSources ?? [])
+  const base = element.type === 'text' ? 'text' : 'barcode'
+  const labelPrefix = element.type === 'text' ? 'Testo' : 'Barcode'
+  const name = uniqueDataSourceName(template, base)
+  const labelNumber =
+    (template.dataSources ?? []).filter((source) => source.name.startsWith(`${base}_`)).length + 1
+
+  if (!template.dataSources) {
+    template.dataSources = []
+  }
+
+  template.dataSources.push({
+    name,
+    label: `${labelPrefix} ${labelNumber}`,
+    defaultValue: currentValue,
+  })
+  element.dataSource = name
+
+  if ('staticValue' in element) {
+    delete element.staticValue
+  }
+
+  return true
 }
 
 export function ensureElementDataSource(template, element) {
@@ -156,16 +236,7 @@ export function updateElementTextValue(template, element, value) {
   const sourceName = element.dataSource ?? ''
 
   if (sourceName && countElementsUsingDataSource(template, sourceName) > 1) {
-    const newName = uniqueDataSourceName(template, 'text')
-    const labelNumber =
-      (template.dataSources ?? []).filter((source) => source.name.startsWith('text_')).length + 1
-
-    template.dataSources.push({
-      name: newName,
-      label: `Testo ${labelNumber}`,
-      defaultValue: nextValue,
-    })
-    element.dataSource = newName
+    disconnectElementFromSharedDataSource(template, element, {}, nextValue)
 
     return
   }

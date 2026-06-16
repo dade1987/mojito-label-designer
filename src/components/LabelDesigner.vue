@@ -11,7 +11,11 @@ import {
 } from '../utils/api.js'
 import {
   buildValuesFromSources,
+  countElementsUsingDataSource,
   createElement,
+  describeElementForUi,
+  disconnectElementFromSharedDataSource,
+  findSharedDataSources,
   registerNewElement,
   updateElementTextValue,
 } from '../utils/templateStore.js'
@@ -60,6 +64,17 @@ const selectedElement = computed(() => {
 })
 
 const selectedCount = computed(() => selectedIds.value.length)
+
+const sharedDataSources = computed(() => {
+  if (!template.value) return []
+  return findSharedDataSources(template.value)
+})
+
+const selectedElementSharesDataSource = computed(() => {
+  if (!selectedElement.value?.dataSource || !template.value) return false
+
+  return countElementsUsingDataSource(template.value, selectedElement.value.dataSource) > 1
+})
 
 const layoutOptions = computed(() => {
   const local = localLayouts.value.map((layout) => ({
@@ -195,6 +210,55 @@ function refreshLocalLayouts() {
 function showStatus(message, type = 'info') {
   statusMessage.value = message
   statusType.value = type
+}
+
+function notifySharedDataSourcesAfterLoad() {
+  if (sharedDataSources.value.length === 0) {
+    return
+  }
+
+  const count = sharedDataSources.value.length
+  showStatus(
+    `Attenzione: ${count} data source condivisi tra più elementi. Controlla il pannello a sinistra.`,
+    'warn'
+  )
+}
+
+function selectElementById(elementId) {
+  selectedIds.value = [elementId]
+}
+
+function handleDisconnectFromElement(element) {
+  if (!template.value || !element) return
+
+  const previousSource = element.dataSource ?? ''
+  const disconnected = disconnectElementFromSharedDataSource(
+    template.value,
+    element,
+    dataValues.value
+  )
+
+  if (!disconnected) {
+    showStatus('Questo elemento non condivide il data source con altri.', 'info')
+    return
+  }
+
+  selectedIds.value = [element.id]
+  showStatus(
+    `Elemento scollegato da "${previousSource}" → ora usa "${element.dataSource}".`,
+    'success'
+  )
+}
+
+function handleDataSourceChange(element) {
+  if (!template.value || !element?.dataSource) return
+
+  if (countElementsUsingDataSource(template.value, element.dataSource) > 1) {
+    showStatus(
+      `"${element.dataSource}" è usato da più elementi: mostrano lo stesso valore finché non scolleghi uno di essi.`,
+      'warn'
+    )
+  }
 }
 
 function addElement(type) {
@@ -370,6 +434,7 @@ async function handleLoadLayout() {
     selectedLayoutId.value = selectedLayoutId.value || `${option.source}:${option.layoutId}`
     selectedIds.value = []
     showStatus(`Layout caricato: ${loaded.name}`, 'success')
+    notifySharedDataSourcesAfterLoad()
   } catch (error) {
     showStatus(error.message, 'error')
   }
@@ -409,6 +474,7 @@ async function handleOpenFromFile() {
       opened.filePath ? `Layout aperto: ${opened.filePath}` : `Layout aperto: ${opened.name}`,
       'success'
     )
+    notifySharedDataSourcesAfterLoad()
   } catch (error) {
     showStatus(error.message, 'error')
   }
@@ -423,6 +489,7 @@ async function handleImportLayout(event) {
     template.value = hydrateTemplate(imported)
     selectedIds.value = []
     showStatus(`Layout importato: ${imported.name}`, 'success')
+    notifySharedDataSourcesAfterLoad()
   } catch (error) {
     showStatus(error.message, 'error')
   } finally {
@@ -469,6 +536,7 @@ function applyJsonEditor() {
     jsonEditorOpen.value = false
     jsonEditorError.value = ''
     showStatus('Layout JSON applicato', 'success')
+    notifySharedDataSourcesAfterLoad()
   } catch (error) {
     jsonEditorError.value = error.message
   }
@@ -579,10 +647,47 @@ function buildApiExample() {
         </div>
 
         <h2>Named Data Sources</h2>
+        <div v-if="sharedDataSources.length" class="shared-datasource-alert">
+          <strong>Data source condivisi</strong>
+          <p class="hint">
+            Lo stesso campo è collegato a più elementi: mostrano sempre lo stesso valore in stampa.
+          </p>
+          <div v-for="group in sharedDataSources" :key="group.name" class="shared-group">
+            <p class="shared-group-title">
+              <code>{{ group.name }}</code>
+              <span>· {{ group.elements.length }} elementi</span>
+            </p>
+            <ul class="shared-element-list">
+              <li v-for="element in group.elements" :key="element.id">
+                <span>{{ describeElementForUi(element) }}</span>
+                <span class="shared-element-actions">
+                  <button type="button" class="btn-link" @click="selectElementById(element.id)">
+                    Seleziona
+                  </button>
+                  <button type="button" class="btn-link warn" @click="handleDisconnectFromElement(element)">
+                    Scollega
+                  </button>
+                </span>
+              </li>
+            </ul>
+          </div>
+        </div>
         <div class="data-sources">
-          <div v-for="source in template.dataSources" :key="source.name" class="data-row">
+          <div
+            v-for="source in template.dataSources"
+            :key="source.name"
+            class="data-row"
+            :class="{ shared: countElementsUsingDataSource(template, source.name) > 1 }"
+          >
             <div class="data-row-header">
               <input v-model="source.label" type="text" placeholder="Etichetta" />
+              <span
+                v-if="countElementsUsingDataSource(template, source.name) > 1"
+                class="usage-badge"
+                :title="`Usato da ${countElementsUsingDataSource(template, source.name)} elementi`"
+              >
+                ×{{ countElementsUsingDataSource(template, source.name) }}
+              </span>
               <button
                 type="button"
                 class="icon-btn"
@@ -632,9 +737,21 @@ function buildApiExample() {
           </label>
 
           <template v-if="selectedElement.type === 'text'">
+            <div v-if="selectedElementSharesDataSource" class="shared-element-warning">
+              <p>
+                Condivide <code>{{ selectedElement.dataSource }}</code> con altri elementi: il valore
+                resta sincronizzato.
+              </p>
+              <button type="button" class="btn ghost" @click="handleDisconnectFromElement(selectedElement)">
+                Scollega da questo elemento
+              </button>
+            </div>
             <label>
               Data source
-              <select v-model="selectedElement.dataSource">
+              <select
+                v-model="selectedElement.dataSource"
+                @change="handleDataSourceChange(selectedElement)"
+              >
                 <option v-for="source in template.dataSources" :key="source.name" :value="source.name">
                   {{ source.name }}
                 </option>
@@ -663,9 +780,21 @@ function buildApiExample() {
           </template>
 
           <template v-if="selectedElement.type === 'barcode'">
+            <div v-if="selectedElementSharesDataSource" class="shared-element-warning">
+              <p>
+                Condivide <code>{{ selectedElement.dataSource }}</code> con altri elementi: il valore
+                resta sincronizzato.
+              </p>
+              <button type="button" class="btn ghost" @click="handleDisconnectFromElement(selectedElement)">
+                Scollega da questo elemento
+              </button>
+            </div>
             <label>
               Data source
-              <select v-model="selectedElement.dataSource">
+              <select
+                v-model="selectedElement.dataSource"
+                @change="handleDataSourceChange(selectedElement)"
+              >
                 <option v-for="source in template.dataSources" :key="source.name" :value="source.name">
                   {{ source.name }}
                 </option>
@@ -971,6 +1100,98 @@ function buildApiExample() {
   padding: 0.5rem;
   border: 1px solid #eee;
   border-radius: 8px;
+}
+
+.data-row.shared {
+  border-color: #ffcc80;
+  background: #fff8e1;
+}
+
+.usage-badge {
+  flex-shrink: 0;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: #ffe0b2;
+  color: #e65100;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.shared-datasource-alert {
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #ffcc80;
+  border-radius: 8px;
+  background: #fff8e1;
+}
+
+.shared-datasource-alert strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #e65100;
+}
+
+.shared-group + .shared-group {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #ffe0b2;
+}
+
+.shared-group-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+}
+
+.shared-group-title code {
+  font-size: 0.82rem;
+}
+
+.shared-element-list {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+}
+
+.shared-element-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.shared-element-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.btn-link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #1565c0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.btn-link.warn {
+  color: #e65100;
+}
+
+.shared-element-warning {
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #ffcc80;
+  border-radius: 8px;
+  background: #fff8e1;
+  font-size: 0.85rem;
+}
+
+.shared-element-warning p {
+  margin: 0 0 0.5rem;
 }
 
 .data-row-header {

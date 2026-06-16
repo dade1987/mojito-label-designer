@@ -4,6 +4,9 @@ import {
   countElementsUsingDataSource,
   createElement,
   createEmptyTemplate,
+  describeElementForUi,
+  disconnectElementFromSharedDataSource,
+  findSharedDataSources,
   registerNewElement,
   resolveElementValue,
   updateElementTextValue,
@@ -135,5 +138,52 @@ describe('templateStore', () => {
     expect(template.dataSources.find((source) => source.name === 'text_1')?.defaultValue).toBe(
       'Solo B'
     )
+  })
+
+  it('findSharedDataSources elenca solo data source usati più volte', () => {
+    const template = {
+      dataSources: [
+        { name: 'title', defaultValue: 'A' },
+        { name: 'serial', defaultValue: 'B' },
+      ],
+      elements: [
+        { id: 'a', type: 'text', dataSource: 'title', x: 1, y: 2 },
+        { id: 'b', type: 'text', dataSource: 'title', x: 3, y: 4 },
+        { id: 'c', type: 'barcode', dataSource: 'serial', x: 5, y: 6 },
+      ],
+    }
+
+    expect(findSharedDataSources(template)).toEqual([
+      {
+        name: 'title',
+        elements: [template.elements[0], template.elements[1]],
+      },
+    ])
+  })
+
+  it('disconnectElementFromSharedDataSource crea un data source dedicato', () => {
+    const template = {
+      dataSources: [{ name: 'title', label: 'Titolo', defaultValue: 'Condiviso' }],
+      elements: [
+        { id: 'a', type: 'text', dataSource: 'title', x: 10, y: 20 },
+        { id: 'b', type: 'text', dataSource: 'title', x: 30, y: 40 },
+      ],
+    }
+
+    const disconnected = disconnectElementFromSharedDataSource(template, template.elements[1], {
+      title: 'Condiviso',
+    })
+
+    expect(disconnected).toBe(true)
+    expect(template.elements[1].dataSource).toBe('text_1')
+    expect(template.dataSources.find((source) => source.name === 'text_1')?.defaultValue).toBe(
+      'Condiviso'
+    )
+    expect(countElementsUsingDataSource(template, 'title')).toBe(1)
+  })
+
+  it('describeElementForUi', () => {
+    expect(describeElementForUi({ type: 'text', x: 10, y: 20 })).toBe('Testo (10, 20)')
+    expect(describeElementForUi({ type: 'barcode', x: 0, y: 5 })).toBe('Barcode (0, 5)')
   })
 })
