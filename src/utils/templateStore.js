@@ -1,3 +1,5 @@
+import { placeNewElement } from './elementPlacement.js'
+
 export function createEmptyTemplate() {
   return {
     name: 'Nuova etichetta',
@@ -14,7 +16,7 @@ export function createEmptyTemplate() {
   }
 }
 
-export function createElement(type, x = 40, y = 40) {
+export function createElement(type, x = 0, y = 0) {
   const id = crypto.randomUUID()
 
   const base = { id, type, x, y }
@@ -140,8 +142,9 @@ export function ensureElementDataSource(template, element) {
   return name
 }
 
-export function registerNewElement(template, element) {
+export function registerNewElement(template, element, displayValues = {}) {
   ensureElementDataSource(template, element)
+  placeNewElement(template, element, displayValues)
   template.elements.push(element)
 
   return element

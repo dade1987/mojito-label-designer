@@ -8,10 +8,14 @@ import {
   formatBarcodeValue,
   formatDisplayText,
 } from '../utils/canvasDisplay.js'
+import {
+  normalizeRect,
+  selectElementsInRect,
+} from '../utils/canvasSelection.js'
 import { resolveElementValue } from '../utils/templateStore.js'
 
 const template = defineModel('template', { required: true })
-const selectedId = defineModel('selectedId', { default: null })
+const selectedIds = defineModel('selectedIds', { default: () => [] })
 
 const emit = defineEmits(['update-text-value'])
 
@@ -23,11 +27,11 @@ const props = defineProps({
 })
 
 const canvasRef = ref(null)
-const dragging = ref(null)
-const dragOffset = ref({ x: 0, y: 0 })
+const groupDrag = ref(null)
 const editingId = ref(null)
 const editValue = ref('')
 const editInputRef = ref(null)
+const marquee = ref(null)
 
 const scale = computed(() => computeScale(template.value.labelWidth))
 
@@ -44,8 +48,94 @@ const elementDisplayValues = computed(() =>
   )
 )
 
-function selectElement(id) {
-  selectedId.value = id
+const marqueeStyle = computed(() => {
+  if (!marquee.value) return null
+
+  const rect = normalizeRect(
+    marquee.value.startX,
+    marquee.value.startY,
+    marquee.value.currentX,
+    marquee.value.currentY
+  )
+
+  return {
+    left: `${rect.x * scale.value}px`,
+    top: `${rect.y * scale.value}px`,
+    width: `${rect.width * scale.value}px`,
+    height: `${rect.height * scale.value}px`,
+  }
+})
+
+function isSelected(id) {
+  return selectedIds.value.includes(id)
+}
+
+function setSelection(ids) {
+  selectedIds.value = ids
+}
+
+function toggleSelection(id) {
+  if (isSelected(id)) {
+    setSelection(selectedIds.value.filter((item) => item !== id))
+    return
+  }
+
+  setSelection([...selectedIds.value, id])
+}
+
+function clientToCanvasDots(clientX, clientY) {
+  const rect = canvasRef.value.getBoundingClientRect()
+
+  return {
+    x: (clientX - rect.left) / scale.value,
+    y: (clientY - rect.top) / scale.value,
+  }
+}
+
+function startMarquee(event) {
+  if (editingId.value) return
+
+  const point = clientToCanvasDots(event.clientX, event.clientY)
+  marquee.value = {
+    startX: point.x,
+    startY: point.y,
+    currentX: point.x,
+    currentY: point.y,
+  }
+
+  window.addEventListener('mousemove', onMarqueeMove)
+  window.addEventListener('mouseup', stopMarquee)
+}
+
+function onMarqueeMove(event) {
+  if (!marquee.value) return
+
+  const point = clientToCanvasDots(event.clientX, event.clientY)
+  marquee.value.currentX = point.x
+  marquee.value.currentY = point.y
+}
+
+function stopMarquee() {
+  if (!marquee.value) return
+
+  const rect = normalizeRect(
+    marquee.value.startX,
+    marquee.value.startY,
+    marquee.value.currentX,
+    marquee.value.currentY
+  )
+
+  if (rect.width < 4 && rect.height < 4) {
+    setSelection([])
+  } else {
+    setSelection(
+      selectElementsInRect(template.value.elements, elementDisplayValues.value, rect)
+    )
+  }
+
+  marquee.value = null
+  window.removeEventListener('mousemove', onMarqueeMove)
+  window.removeEventListener('mouseup', stopMarquee)
 }
 
 function startDrag(event, element) {
@@ -53,13 +143,31 @@ function startDrag(event, element) {
   if (event.detail > 1) return
   if (!canvasRef.value) return
 
-  dragging.value = element
-  selectedId.value = element.id
+  if (event.shiftKey) {
+    toggleSelection(element.id)
+    return
+  }
+
+  if (!isSelected(element.id)) {
+    setSelection([element.id])
+  }
 
   const rect = canvasRef.value.getBoundingClientRect()
-  dragOffset.value = {
-    x: (event.clientX - rect.left) / scale.value - element.x,
-    y: (event.clientY - rect.top) / scale.value - element.y,
+  const pointerX = (event.clientX - rect.left) / scale.value
+  const pointerY = (event.clientY - rect.top) / scale.value
+
+  const starts = {}
+  for (const item of template.value.elements) {
+    if (isSelected(item.id)) {
+      starts[item.id] = { x: item.x, y: item.y }
+    }
+  }
+
+  groupDrag.value = {
+    starts,
+    anchorId: element.id,
+    offsetX: pointerX - element.x,
+    offsetY: pointerY - element.y,
   }
 
   window.addEventListener('mousemove', onDrag)
@@ -67,25 +175,37 @@ function startDrag(event, element) {
 }
 
 function onDrag(event) {
-  if (!dragging.value || !canvasRef.value) return
+  if (!groupDrag.value || !canvasRef.value) return
 
   const rect = canvasRef.value.getBoundingClientRect()
-  const x = Math.max(0, Math.round((event.clientX - rect.left) / scale.value - dragOffset.value.x))
-  const y = Math.max(0, Math.round((event.clientY - rect.top) / scale.value - dragOffset.value.y))
+  const pointerX = (event.clientX - rect.left) / scale.value
+  const pointerY = (event.clientY - rect.top) / scale.value
+  const anchorStart = groupDrag.value.starts[groupDrag.value.anchorId]
+  if (!anchorStart) return
 
-  dragging.value.x = x
-  dragging.value.y = y
+  const anchorX = Math.max(0, Math.round(pointerX - groupDrag.value.offsetX))
+  const anchorY = Math.max(0, Math.round(pointerY - groupDrag.value.offsetY))
+  const deltaX = anchorX - anchorStart.x
+  const deltaY = anchorY - anchorStart.y
+
+  for (const item of template.value.elements) {
+    const start = groupDrag.value.starts[item.id]
+    if (!start) continue
+
+    item.x = Math.max(0, Math.round(start.x + deltaX))
+    item.y = Math.max(0, Math.round(start.y + deltaY))
+  }
 }
 
 function stopDrag() {
-  dragging.value = null
+  groupDrag.value = null
   window.removeEventListener('mousemove', onDrag)
   window.removeEventListener('mouseup', stopDrag)
 }
 
 async function startTextEdit(event, element) {
   event.stopPropagation()
-  selectedId.value = element.id
+  setSelection([element.id])
   editingId.value = element.id
   editValue.value = resolveElementValue(
     element,
@@ -114,6 +234,17 @@ function cancelTextEdit() {
 function setEditInputRef(element, node) {
   if (editingId.value === element.id) {
     editInputRef.value = node
+  }
+}
+
+function onElementClick(event, id) {
+  if (event.shiftKey) {
+    toggleSelection(id)
+    return
+  }
+
+  if (!isSelected(id)) {
+    setSelection([id])
   }
 }
 
@@ -160,23 +291,29 @@ function displayBarcodeValue(element) {
   <div class="canvas-wrapper">
     <div class="canvas-meta">
       {{ template.labelWidth }} × {{ template.labelHeight }} dots @ {{ template.dpi }} DPI
-      (scale {{ Math.round(scale * 100) }}%)
+      (scale {{ Math.round(scale * 100) }}%) · trascina area vuota per selezione multipla
     </div>
 
     <div
       ref="canvasRef"
       class="canvas"
       :style="canvasStyle"
-      @click.self="selectedId = null"
+      @mousedown.self="startMarquee"
     >
+      <div
+        v-if="marqueeStyle"
+        class="marquee"
+        :style="marqueeStyle"
+      />
+
       <div
         v-for="element in template.elements"
         :key="`${element.id}-${elementDisplayValues[element.id] ?? ''}-${element.bold ? 'b' : 'n'}`"
         class="element"
-        :class="[element.type, { selected: selectedId === element.id, editing: editingId === element.id }]"
+        :class="[element.type, { selected: isSelected(element.id), editing: editingId === element.id }]"
         :style="elementStyle(element)"
         @mousedown.prevent="startDrag($event, element)"
-        @click.stop="selectElement(element.id)"
+        @click.stop="onElementClick($event, element.id)"
       >
         <template v-if="element.type === 'text'">
           <input
@@ -234,6 +371,7 @@ function displayBarcodeValue(element) {
 .canvas-meta {
   font-size: 0.85rem;
   color: #666;
+  text-align: center;
 }
 
 .canvas {
@@ -243,6 +381,15 @@ function displayBarcodeValue(element) {
   border-radius: 8px;
   box-shadow: inset 0 0 0 1px #eee;
   overflow: hidden;
+  cursor: crosshair;
+}
+
+.marquee {
+  position: absolute;
+  border: 1px dashed #1a73e8;
+  background: rgba(26, 115, 232, 0.12);
+  pointer-events: none;
+  z-index: 2;
 }
 
 .element {
@@ -251,6 +398,7 @@ function displayBarcodeValue(element) {
   user-select: none;
   padding: 2px;
   border: 1px solid transparent;
+  z-index: 1;
 }
 
 .element.selected {

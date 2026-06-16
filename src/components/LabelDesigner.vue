@@ -32,7 +32,7 @@ import {
 import LabelCanvas from './LabelCanvas.vue'
 
 const template = ref(null)
-const selectedId = ref(null)
+const selectedIds = ref([])
 const printers = ref([])
 const selectedPrinter = ref('')
 const printerPlatform = ref('')
@@ -49,9 +49,12 @@ const dataValues = computed(() => {
   return buildValuesFromSources(template.value.dataSources)
 })
 
-const selectedElement = computed(() =>
-  template.value?.elements.find((el) => el.id === selectedId.value) ?? null
-)
+const selectedElement = computed(() => {
+  if (selectedIds.value.length !== 1 || !template.value) return null
+  return template.value.elements.find((el) => el.id === selectedIds.value[0]) ?? null
+})
+
+const selectedCount = computed(() => selectedIds.value.length)
 
 const layoutOptions = computed(() => {
   const local = localLayouts.value.map((layout) => ({
@@ -191,15 +194,16 @@ function showStatus(message, type = 'info') {
 
 function addElement(type) {
   if (!template.value) return
-  const element = createElement(type, 40, 40 + template.value.elements.length * 40)
-  registerNewElement(template.value, element)
-  selectedId.value = element.id
+  const element = createElement(type)
+  registerNewElement(template.value, element, dataValues.value)
+  selectedIds.value = [element.id]
 }
 
 function removeSelected() {
-  if (!template.value || !selectedId.value) return
-  template.value.elements = template.value.elements.filter((el) => el.id !== selectedId.value)
-  selectedId.value = null
+  if (!template.value || selectedIds.value.length === 0) return
+  const ids = new Set(selectedIds.value)
+  template.value.elements = template.value.elements.filter((el) => !ids.has(el.id))
+  selectedIds.value = []
 }
 
 function handleKeydown(event) {
@@ -210,7 +214,7 @@ function handleKeydown(event) {
     return
   }
 
-  if (event.key === 'Delete' && selectedId.value) {
+  if (event.key === 'Delete' && selectedIds.value.length > 0) {
     event.preventDefault()
     removeSelected()
   }
@@ -359,7 +363,7 @@ async function handleLoadLayout() {
     template.value = hydrateTemplate(loaded)
     rememberActiveLayout(option.source, option.layoutId)
     selectedLayoutId.value = selectedLayoutId.value || `${option.source}:${option.layoutId}`
-    selectedId.value = null
+    selectedIds.value = []
     showStatus(`Layout caricato: ${loaded.name}`, 'success')
   } catch (error) {
     showStatus(error.message, 'error')
@@ -395,7 +399,7 @@ async function handleOpenFromFile() {
     }
 
     template.value = hydrateTemplate(opened)
-    selectedId.value = null
+    selectedIds.value = []
     showStatus(
       opened.filePath ? `Layout aperto: ${opened.filePath}` : `Layout aperto: ${opened.name}`,
       'success'
@@ -412,7 +416,7 @@ async function handleImportLayout(event) {
   try {
     const imported = await importLayoutFromFile(file)
     template.value = hydrateTemplate(imported)
-    selectedId.value = null
+    selectedIds.value = []
     showStatus(`Layout importato: ${imported.name}`, 'success')
   } catch (error) {
     showStatus(error.message, 'error')
@@ -559,7 +563,7 @@ function buildApiExample() {
       <section class="canvas-area">
         <LabelCanvas
           v-model:template="template"
-          v-model:selected-id="selectedId"
+          v-model:selected-ids="selectedIds"
           :data-values="dataValues"
           @update-text-value="handleUpdateTextValue"
         />
@@ -567,7 +571,14 @@ function buildApiExample() {
 
       <aside class="panel right">
         <h2>Proprietà</h2>
-        <div v-if="selectedElement" class="properties">
+        <div v-if="selectedCount > 1" class="properties">
+          <p class="hint">{{ selectedCount }} elementi selezionati</p>
+          <p class="hint">Trascina per spostarli insieme · Shift+click per aggiungere/togliere · Canc per eliminare</p>
+          <button type="button" class="btn danger" @click="removeSelected">
+            Elimina selezione ({{ selectedCount }})
+          </button>
+        </div>
+        <div v-else-if="selectedElement" class="properties">
           <label>
             Tipo
             <input :value="selectedElement.type" disabled />
@@ -651,7 +662,7 @@ function buildApiExample() {
 
           <button type="button" class="btn danger" @click="removeSelected">Elimina elemento</button>
         </div>
-        <p v-else class="hint">Seleziona un elemento sul canvas</p>
+        <p v-else class="hint">Seleziona uno o più elementi sul canvas (trascina un’area vuota)</p>
 
         <h2>Etichetta</h2>
         <label>
