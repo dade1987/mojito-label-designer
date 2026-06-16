@@ -1,4 +1,7 @@
-import { placeNewElement } from './elementPlacement.js'
+import { cloneTemplateState } from './cloneSerializable.js'
+import { findEmptyPlacement, placeNewElement } from './elementPlacement.js'
+
+const DUPLICATE_OFFSET = 20
 
 export function createEmptyTemplate() {
   return {
@@ -303,6 +306,40 @@ export function registerNewElement(template, element, displayValues = {}) {
   template.elements.push(element)
 
   return element
+}
+
+export function duplicateElementInTemplate(
+  template,
+  source,
+  displayValues = {},
+  offset = DUPLICATE_OFFSET
+) {
+  const clone = cloneTemplateState(source)
+  clone.id = crypto.randomUUID()
+
+  const preferred = {
+    x: (source.x ?? 0) + offset,
+    y: (source.y ?? 0) + offset,
+  }
+  const position = findEmptyPlacement(template, clone.type, displayValues, preferred)
+  clone.x = position.x
+  clone.y = position.y
+
+  template.elements.push(clone)
+
+  if (clone.type === 'text' || clone.type === 'barcode') {
+    const copiedValue = resolveElementValue(source, displayValues, template.dataSources ?? [])
+    clone.dataSource = ''
+    reassignElementToDedicatedDataSource(template, clone, displayValues, copiedValue)
+  }
+
+  return clone
+}
+
+export function duplicateElementsInTemplate(template, sources, displayValues = {}) {
+  return (sources ?? []).map((source) =>
+    duplicateElementInTemplate(template, source, displayValues, DUPLICATE_OFFSET)
+  )
 }
 
 export function updateElementTextValue(template, element, value) {

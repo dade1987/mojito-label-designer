@@ -14,6 +14,7 @@ import {
   countElementsUsingDataSource,
   createElement,
   describeElementForUi,
+  duplicateElementsInTemplate,
   disconnectElementFromSharedDataSource,
   findSharedDataSources,
   getElementsUsingDataSource,
@@ -57,6 +58,7 @@ const jsonEditorOpen = ref(false)
 const jsonEditorText = ref('')
 const jsonEditorError = ref('')
 const dataSourceRemovalPrompt = ref(null)
+const clipboardElements = ref([])
 
 const dataValues = computed(() => {
   if (!template.value) return {}
@@ -292,6 +294,64 @@ function selectElementById(elementId) {
   selectedIds.value = [elementId]
 }
 
+function getSelectedElements() {
+  if (!template.value || selectedIds.value.length === 0) return []
+
+  const ids = new Set(selectedIds.value)
+
+  return template.value.elements.filter((element) => ids.has(element.id))
+}
+
+function copySelected() {
+  const sources = getSelectedElements()
+
+  if (sources.length === 0) {
+    showStatus('Seleziona almeno un elemento da copiare.', 'info')
+    return
+  }
+
+  clipboardElements.value = cloneTemplateState(sources)
+  showStatus(`${sources.length} elemento/i copiato/i · Ctrl+V per incollare`, 'info')
+}
+
+function duplicateSelected() {
+  if (!template.value) return
+
+  const sources = getSelectedElements()
+
+  if (sources.length === 0) {
+    showStatus('Seleziona almeno un elemento da duplicare.', 'info')
+    return
+  }
+
+  const copies = duplicateElementsInTemplate(template.value, sources, dataValues.value)
+  selectedIds.value = copies.map((element) => element.id)
+  showStatus(`${copies.length} elemento/i duplicato/i`, 'success')
+}
+
+function pasteClipboard() {
+  if (!template.value) return
+
+  if (clipboardElements.value.length === 0) {
+    showStatus('Nessun elemento negli appunti. Usa Ctrl+C per copiare.', 'info')
+    return
+  }
+
+  const copies = duplicateElementsInTemplate(
+    template.value,
+    clipboardElements.value,
+    dataValues.value
+  )
+  selectedIds.value = copies.map((element) => element.id)
+  showStatus(`${copies.length} elemento/i incollato/i`, 'success')
+}
+
+function isShortcutTargetEditable(target) {
+  const tag = target?.tagName?.toLowerCase() ?? ''
+
+  return tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable
+}
+
 function handleDisconnectFromElement(element) {
   if (!template.value || !element) return
 
@@ -367,10 +427,27 @@ function handleDataSourceNameBlur(source) {
 }
 
 function handleKeydown(event) {
-  const target = event.target
-  const tag = target?.tagName?.toLowerCase() ?? ''
+  if (isShortcutTargetEditable(event.target)) {
+    return
+  }
 
-  if (tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable) {
+  const mod = event.ctrlKey || event.metaKey
+
+  if (mod && event.key.toLowerCase() === 'c') {
+    event.preventDefault()
+    copySelected()
+    return
+  }
+
+  if (mod && event.key.toLowerCase() === 'v') {
+    event.preventDefault()
+    pasteClipboard()
+    return
+  }
+
+  if (mod && event.key.toLowerCase() === 'd') {
+    event.preventDefault()
+    duplicateSelected()
     return
   }
 
@@ -884,10 +961,19 @@ function buildApiExample() {
         <h2>Proprietà</h2>
         <div v-if="selectedCount > 1" class="properties">
           <p class="hint">{{ selectedCount }} elementi selezionati</p>
-          <p class="hint">Trascina per spostarli insieme · Shift+click per aggiungere/togliere · Canc per eliminare</p>
-          <button type="button" class="btn danger" @click="removeSelected">
-            Elimina selezione ({{ selectedCount }})
-          </button>
+          <p class="hint">Trascina per spostarli · Shift+click · Ctrl+C/V/D · Canc per eliminare</p>
+          <div class="property-actions">
+            <button type="button" class="btn ghost" @click="duplicateSelected">
+              Duplica selezione
+            </button>
+            <button type="button" class="btn ghost" @click="copySelected">Copia</button>
+            <button type="button" class="btn ghost" :disabled="clipboardElements.length === 0" @click="pasteClipboard">
+              Incolla
+            </button>
+            <button type="button" class="btn danger" @click="removeSelected">
+              Elimina selezione ({{ selectedCount }})
+            </button>
+          </div>
         </div>
         <div v-else-if="selectedElement" class="properties">
           <label>
@@ -999,9 +1085,16 @@ function buildApiExample() {
             </label>
           </template>
 
-          <button type="button" class="btn danger" @click="removeSelected">Elimina elemento</button>
+          <div class="property-actions">
+            <button type="button" class="btn ghost" @click="duplicateSelected">Duplica</button>
+            <button type="button" class="btn ghost" @click="copySelected">Copia</button>
+            <button type="button" class="btn ghost" :disabled="clipboardElements.length === 0" @click="pasteClipboard">
+              Incolla
+            </button>
+            <button type="button" class="btn danger" @click="removeSelected">Elimina elemento</button>
+          </div>
         </div>
-        <p v-else class="hint">Seleziona uno o più elementi sul canvas (trascina un’area vuota)</p>
+        <p v-else class="hint">Seleziona uno o più elementi sul canvas · Ctrl+C/V/D</p>
 
         <h2>Etichetta</h2>
         <label>
@@ -1481,6 +1574,11 @@ function buildApiExample() {
   display: grid;
   gap: 0.75rem;
   margin-bottom: 1.5rem;
+}
+
+.property-actions {
+  display: grid;
+  gap: 0.5rem;
 }
 
 .properties label {
