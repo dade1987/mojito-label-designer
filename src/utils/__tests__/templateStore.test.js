@@ -29,6 +29,11 @@ describe('templateStore', () => {
     expect(positioned.y).toBe(20)
     expect(createElement('text').dataSource).toBe('')
     expect(createElement('barcode').barcodeType).toBe('code128')
+    expect(createElement('qr')).toMatchObject({
+      magnification: 4,
+      errorCorrection: 'M',
+      dataSource: '',
+    })
     expect(createElement('image').width).toBe(80)
     expect(createElement('unknown').type).toBe('unknown')
   })
@@ -124,6 +129,29 @@ describe('templateStore', () => {
     expect(countElementsUsingDataSource(template, 'text_1')).toBe(1)
   })
 
+  it('registerNewElement assegna data source dedicato con prefisso QR', () => {
+    const template = createEmptyTemplate()
+
+    registerNewElement(template, createElement('qr', 10, 10))
+
+    expect(template.elements[0].dataSource).toBe('qr_1')
+    expect(
+      template.dataSources.find((source) => source.name === 'qr_1')?.label
+    ).toBe('QR 1')
+  })
+
+  it('registerNewElement assegna data source dedicato con prefisso Barcode', () => {
+    const template = createEmptyTemplate()
+    template.dataSources = []
+
+    registerNewElement(template, createElement('barcode', 10, 10))
+
+    expect(template.elements[0].dataSource).toBe('barcode_1')
+    expect(
+      template.dataSources.find((source) => source.name === 'barcode_1')?.label
+    ).toBe('Barcode 1')
+  })
+
   it('updateElementTextValue scollega elementi che condividono data source', () => {
     const template = {
       dataSources: [{ name: 'title', label: 'Titolo', defaultValue: 'Condiviso' }],
@@ -189,6 +217,8 @@ describe('templateStore', () => {
   it('describeElementForUi', () => {
     expect(describeElementForUi({ type: 'text', x: 10, y: 20 })).toBe('Testo (10, 20)')
     expect(describeElementForUi({ type: 'barcode', x: 0, y: 5 })).toBe('Barcode (0, 5)')
+    expect(describeElementForUi({ type: 'qr', x: 1, y: 2 })).toBe('QR (1, 2)')
+    expect(describeElementForUi({ type: 'image', x: 3, y: 4 })).toBe('image (3, 4)')
   })
 
   it('pruneUnusedDataSources rimuove qualsiasi data source non usato', () => {

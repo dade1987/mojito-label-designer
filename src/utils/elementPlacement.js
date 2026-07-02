@@ -31,6 +31,9 @@ export function defaultElementSize(type) {
     case 'barcode':
       // Code 128 di 6 cifre a modulo 2 (~202 dots) più riga interpretazione.
       return { width: 210, height: 130 }
+    case 'qr':
+      // Magnification di default 4 → vedi qrPlaceholderSize() in canvasSelection.js.
+      return { width: 100, height: 100 }
     case 'image':
       return { width: 80, height: 80 }
     default:

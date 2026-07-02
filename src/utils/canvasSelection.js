@@ -7,6 +7,12 @@ export function estimateTextWidth(text, fontHeight = 30, fontWidth = fontHeight)
   return Math.max(20, String(text).length * (fontWidth * 0.55))
 }
 
+export function qrPlaceholderSize(element) {
+  const magnification = Math.max(1, Math.min(10, element.magnification ?? 4))
+
+  return magnification * 25
+}
+
 export function getElementBounds(element, displayValues) {
   const x = element.x ?? 0
   const y = element.y ?? 0
@@ -42,6 +48,12 @@ export function getElementBounds(element, displayValues) {
       width: element.width ?? 80,
       height: element.height ?? 80,
     }
+  }
+
+  if (element.type === 'qr') {
+    const size = qrPlaceholderSize(element)
+
+    return { x, y, width: size, height: size }
   }
 
   return { x, y, width: 40, height: 40 }

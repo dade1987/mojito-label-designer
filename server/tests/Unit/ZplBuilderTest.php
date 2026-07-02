@@ -151,4 +151,69 @@ final class ZplBuilderTest extends TestCase
         $this->assertStringContainsString('^GB', $zpl);
         $this->assertStringContainsString('LINE', $zpl);
     }
+
+    public function test_render_qr_with_defaults(): void
+    {
+        $zpl = $this->builder->renderTemplate([
+            'elements' => [
+                ['type' => 'qr', 'x' => 10, 'y' => 20, 'dataSource' => 'passport'],
+            ],
+        ], ['passport' => 'PACK-42']);
+
+        $this->assertStringContainsString('^FO10,20^BQN,2,4^FDMA,PACK-42^FS', $zpl);
+    }
+
+    public function test_render_qr_with_custom_magnification_and_error_correction(): void
+    {
+        $zpl = $this->builder->renderTemplate([
+            'elements' => [
+                [
+                    'type' => 'qr',
+                    'x' => 0,
+                    'y' => 0,
+                    'staticValue' => 'ABC',
+                    'magnification' => 7,
+                    'errorCorrection' => 'H',
+                ],
+            ],
+        ]);
+
+        $this->assertStringContainsString('^BQN,2,7^FDHA,ABC^FS', $zpl);
+    }
+
+    public function test_render_qr_clamps_magnification_to_valid_range(): void
+    {
+        $tooLow = $this->builder->renderTemplate([
+            'elements' => [['type' => 'qr', 'x' => 0, 'y' => 0, 'staticValue' => 'X', 'magnification' => 0]],
+        ]);
+        $tooHigh = $this->builder->renderTemplate([
+            'elements' => [['type' => 'qr', 'x' => 0, 'y' => 0, 'staticValue' => 'X', 'magnification' => 99]],
+        ]);
+
+        $this->assertStringContainsString('^BQN,2,1^FD', $tooLow);
+        $this->assertStringContainsString('^BQN,2,10^FD', $tooHigh);
+    }
+
+    public function test_render_qr_falls_back_to_medium_error_correction_for_invalid_values(): void
+    {
+        $zpl = $this->builder->renderTemplate([
+            'elements' => [
+                ['type' => 'qr', 'x' => 0, 'y' => 0, 'staticValue' => 'X', 'errorCorrection' => 'Z'],
+            ],
+        ]);
+
+        $this->assertStringContainsString('^FDMA,X^FS', $zpl);
+    }
+
+    public function test_render_qr_escapes_special_chars(): void
+    {
+        $zpl = $this->builder->renderTemplate([
+            'elements' => [
+                ['type' => 'qr', 'x' => 0, 'y' => 0, 'staticValue' => 'A^B~C'],
+            ],
+        ]);
+
+        $this->assertStringContainsString('\5E', $zpl);
+        $this->assertStringContainsString('\7E', $zpl);
+    }
 }

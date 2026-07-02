@@ -885,6 +885,7 @@ function buildApiExample() {
         <div class="palette">
           <button type="button" @click="addElement('text')">+ Testo</button>
           <button type="button" @click="addElement('barcode')">+ Barcode</button>
+          <button type="button" @click="addElement('qr')">+ QR</button>
           <button type="button" @click="addElement('image')">+ Immagine</button>
         </div>
 
@@ -1067,6 +1068,42 @@ function buildApiExample() {
             <label>
               Module width
               <input v-model.number="selectedElement.moduleWidth" type="number" min="1" max="10" />
+            </label>
+          </template>
+
+          <template v-if="selectedElement.type === 'qr'">
+            <div v-if="selectedElementSharesDataSource" class="shared-element-warning">
+              <p>
+                Condivide <code>{{ selectedElement.dataSource }}</code> con altri elementi: il valore
+                resta sincronizzato.
+              </p>
+              <button type="button" class="btn ghost" @click="handleDisconnectFromElement(selectedElement)">
+                Scollega da questo elemento
+              </button>
+            </div>
+            <label>
+              Data source
+              <select
+                v-model="selectedElement.dataSource"
+                @change="handleDataSourceChange(selectedElement)"
+              >
+                <option v-for="source in template.dataSources" :key="source.name" :value="source.name">
+                  {{ source.name }}
+                </option>
+              </select>
+            </label>
+            <label>
+              Correzione errore
+              <select v-model="selectedElement.errorCorrection">
+                <option value="L">L (bassa)</option>
+                <option value="M">M (media)</option>
+                <option value="Q">Q (alta)</option>
+                <option value="H">H (massima)</option>
+              </select>
+            </label>
+            <label>
+              Magnification
+              <input v-model.number="selectedElement.magnification" type="number" min="1" max="10" />
             </label>
           </template>
 

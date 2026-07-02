@@ -2,6 +2,23 @@ import { cloneTemplateState } from './cloneSerializable.js'
 import { findEmptyPlacement, placeNewElement } from './elementPlacement.js'
 
 const DUPLICATE_OFFSET = 20
+const DATA_BOUND_TYPES = ['text', 'barcode', 'qr']
+
+function isDataBoundElement(element) {
+  return DATA_BOUND_TYPES.includes(element.type)
+}
+
+function dataSourceNaming(type) {
+  if (type === 'text') {
+    return { base: 'text', labelPrefix: 'Testo' }
+  }
+
+  if (type === 'qr') {
+    return { base: 'qr', labelPrefix: 'QR' }
+  }
+
+  return { base: 'barcode', labelPrefix: 'Barcode' }
+}
 
 export function createEmptyTemplate() {
   return {
@@ -45,6 +62,15 @@ export function createElement(type, x = 0, y = 0) {
       moduleWidth: 2,
       height: 100,
       showText: true,
+      dataSource: '',
+    }
+  }
+
+  if (type === 'qr') {
+    return {
+      ...base,
+      magnification: 4,
+      errorCorrection: 'M',
       dataSource: '',
     }
   }
@@ -113,9 +139,7 @@ export function getElementsUsingDataSource(template, dataSourceName) {
   }
 
   return (template.elements ?? []).filter(
-    (element) =>
-      (element.type === 'text' || element.type === 'barcode') &&
-      element.dataSource === dataSourceName
+    (element) => isDataBoundElement(element) && element.dataSource === dataSourceName
   )
 }
 
@@ -123,7 +147,7 @@ export function findSharedDataSources(template) {
   const groups = new Map()
 
   for (const element of template.elements ?? []) {
-    if (element.type !== 'text' && element.type !== 'barcode') {
+    if (!isDataBoundElement(element)) {
       continue
     }
 
@@ -145,8 +169,9 @@ export function findSharedDataSources(template) {
 }
 
 export function describeElementForUi(element) {
-  const typeLabel =
-    element.type === 'text' ? 'Testo' : element.type === 'barcode' ? 'Barcode' : element.type
+  const typeLabel = isDataBoundElement(element)
+    ? dataSourceNaming(element.type).labelPrefix
+    : element.type
 
   return `${typeLabel} (${element.x ?? 0}, ${element.y ?? 0})`
 }
@@ -161,8 +186,7 @@ export function reassignElementToDedicatedDataSource(
     overrideValue !== undefined
       ? String(overrideValue)
       : resolveElementValue(element, dataValues, template.dataSources ?? [])
-  const base = element.type === 'text' ? 'text' : 'barcode'
-  const labelPrefix = element.type === 'text' ? 'Testo' : 'Barcode'
+  const { base, labelPrefix } = dataSourceNaming(element.type)
   const name = uniqueDataSourceName(template, base)
   const labelNumber =
     (template.dataSources ?? []).filter((source) => source.name.startsWith(`${base}_`)).length + 1
@@ -203,12 +227,11 @@ export function disconnectElementFromSharedDataSource(
 }
 
 export function ensureElementDataSource(template, element) {
-  if (element.type !== 'text' && element.type !== 'barcode') {
+  if (!isDataBoundElement(element)) {
     return element.dataSource ?? ''
   }
 
-  const base = element.type === 'text' ? 'text' : 'barcode'
-  const labelPrefix = element.type === 'text' ? 'Testo' : 'Barcode'
+  const { base, labelPrefix } = dataSourceNaming(element.type)
   const current = element.dataSource ?? ''
   const needsDedicatedSource =
     current === '' ||
@@ -256,7 +279,7 @@ export function repairBrokenDataSourceReferences(template) {
   const known = new Set((template.dataSources ?? []).map((source) => source.name))
 
   for (const element of template.elements ?? []) {
-    if (element.type !== 'text' && element.type !== 'barcode') {
+    if (!isDataBoundElement(element)) {
       continue
     }
 
@@ -327,7 +350,7 @@ export function duplicateElementInTemplate(
 
   template.elements.push(clone)
 
-  if (clone.type === 'text' || clone.type === 'barcode') {
+  if (isDataBoundElement(clone)) {
     const copiedValue = resolveElementValue(source, displayValues, template.dataSources ?? [])
     clone.dataSource = ''
     reassignElementToDedicatedDataSource(template, clone, displayValues, copiedValue)

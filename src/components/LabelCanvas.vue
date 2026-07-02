@@ -11,6 +11,7 @@ import {
 } from '../utils/canvasDisplay.js'
 import {
   normalizeRect,
+  qrPlaceholderSize,
   selectElementsInRect,
 } from '../utils/canvasSelection.js'
 import { resolveElementValue } from '../utils/templateStore.js'
@@ -297,6 +298,12 @@ function imageStyle(element) {
   }
 }
 
+function qrStyle(element) {
+  const size = qrPlaceholderSize(element) * scale.value
+
+  return { width: `${size}px`, height: `${size}px` }
+}
+
 function displayText(element) {
   return formatDisplayText(element, elementDisplayValues.value)
 }
@@ -379,6 +386,13 @@ function displayBarcodeValue(element) {
             <small v-if="barcodeMetrics(element).showText" :style="barcodeTextStyle(element)">
               {{ displayBarcodeValue(element) }}
             </small>
+          </div>
+        </template>
+
+        <template v-else-if="element.type === 'qr'">
+          <div class="qr-placeholder" :style="qrStyle(element)">
+            <span>QR</span>
+            <small>{{ elementDisplayValues[element.id] || '' }}</small>
           </div>
         </template>
 
@@ -487,6 +501,36 @@ function displayBarcodeValue(element) {
   border: 1px dashed #999;
   color: #666;
   font-size: 0.75rem;
+}
+
+.qr-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: repeating-conic-gradient(#333 0% 25%, #fff 0% 50%) 0 0 / 10px 10px;
+  border: 1px solid #333;
+  color: #333;
+  font-size: 0.7rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-align: center;
+}
+
+.qr-placeholder span {
+  background: #fff;
+  padding: 0 3px;
+}
+
+.qr-placeholder small {
+  background: #fff;
+  padding: 0 2px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 400;
 }
 
 .element img {

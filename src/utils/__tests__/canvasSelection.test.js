@@ -3,6 +3,7 @@ import {
   estimateTextWidth,
   getElementBounds,
   normalizeRect,
+  qrPlaceholderSize,
   rectsIntersect,
   selectElementsInRect,
 } from '../canvasSelection.js'
@@ -71,5 +72,21 @@ describe('canvasSelection', () => {
       {}
     )
     expect(imageBounds).toEqual({ x: 1, y: 2, width: 50, height: 40 })
+  })
+
+  it('qrPlaceholderSize scala con la magnification e resta nel range valido', () => {
+    expect(qrPlaceholderSize({ magnification: 4 })).toBe(100)
+    expect(qrPlaceholderSize({})).toBe(100)
+    expect(qrPlaceholderSize({ magnification: 0 })).toBe(25)
+    expect(qrPlaceholderSize({ magnification: 99 })).toBe(250)
+  })
+
+  it('getElementBounds usa qrPlaceholderSize per il tipo qr', () => {
+    expect(getElementBounds({ id: 'q', type: 'qr', x: 7, y: 8, magnification: 2 }, {})).toEqual({
+      x: 7,
+      y: 8,
+      width: 50,
+      height: 50,
+    })
   })
 })

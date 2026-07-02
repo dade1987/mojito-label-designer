@@ -91,6 +91,7 @@ final class ZplBuilder
         return match ($type) {
             'text' => $this->renderText($element, $values, $x, $y),
             'barcode' => $this->renderBarcode($element, $values, $x, $y),
+            'qr' => $this->renderQr($element, $values, $x, $y),
             'image' => $this->renderImage($element, $x, $y),
             default => '',
         };
@@ -177,6 +178,27 @@ final class ZplBuilder
             $showText,
             $data
         );
+    }
+
+    /**
+     * QR Code model 2, modalità di input automatica (`<errorCorrection>A,<data>`).
+     *
+     * @param  array<string, mixed>  $element
+     * @param  array<string, mixed>  $values
+     */
+    private function renderQr(array $element, array $values, int $x, int $y): string
+    {
+        $value = $this->resolveValue($element, $values);
+        $magnification = max(1, min(10, TypeCaster::int($element['magnification'] ?? 4, 4)));
+        $errorCorrection = TypeCaster::string($element['errorCorrection'] ?? 'M', 'M');
+
+        if (! in_array($errorCorrection, ['H', 'Q', 'M', 'L'], true)) {
+            $errorCorrection = 'M';
+        }
+
+        $data = $this->escapeFieldData($value);
+
+        return sprintf('^FO%d,%d^BQN,2,%d^FD%sA,%s^FS', $x, $y, $magnification, $errorCorrection, $data);
     }
 
     /**
