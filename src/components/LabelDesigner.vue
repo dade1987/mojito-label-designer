@@ -47,6 +47,7 @@ import {
   applyFormat,
   detectFormat,
   dotsToMm,
+  mmToDots,
   rescaleTemplateForDpi,
 } from '../utils/labelFormats.js'
 import LabelCanvas from './LabelCanvas.vue'
@@ -100,6 +101,24 @@ const dpiOptions = computed(() => {
   }
 
   return [{ dpi: current, label: `${current} dpi` }, ...PRINTER_RESOLUTIONS]
+})
+
+const labelWidthMm = computed({
+  get: () => dotsToMm(template.value?.labelWidth ?? 0, template.value?.dpi ?? 203),
+  set: (mm) => {
+    if (template.value && Number(mm) > 0) {
+      template.value.labelWidth = mmToDots(Number(mm), template.value.dpi ?? 203)
+    }
+  },
+})
+
+const labelHeightMm = computed({
+  get: () => dotsToMm(template.value?.labelHeight ?? 0, template.value?.dpi ?? 203),
+  set: (mm) => {
+    if (template.value && Number(mm) > 0) {
+      template.value.labelHeight = mmToDots(Number(mm), template.value.dpi ?? 203)
+    }
+  },
 })
 
 const selectedElement = computed(() => {
@@ -1192,14 +1211,26 @@ function buildApiExample() {
           Cambiando risoluzione, etichetta ed elementi vengono riscalati per
           mantenere le stesse misure in mm.
         </p>
-        <label>
-          Larghezza (dots) · {{ dotsToMm(template.labelWidth, template.dpi) }} mm
-          <input v-model.number="template.labelWidth" type="number" min="100" />
-        </label>
-        <label>
-          Altezza (dots) · {{ dotsToMm(template.labelHeight, template.dpi) }} mm
-          <input v-model.number="template.labelHeight" type="number" min="100" />
-        </label>
+        <div class="size-row">
+          <label>
+            Larghezza (mm)
+            <input v-model.number="labelWidthMm" type="number" min="10" max="104" step="0.5" />
+          </label>
+          <label>
+            Altezza (mm)
+            <input v-model.number="labelHeightMm" type="number" min="6" step="0.5" />
+          </label>
+        </div>
+        <div class="size-row">
+          <label>
+            Larghezza (dots)
+            <input v-model.number="template.labelWidth" type="number" min="80" />
+          </label>
+          <label>
+            Altezza (dots)
+            <input v-model.number="template.labelHeight" type="number" min="48" />
+          </label>
+        </div>
         </div>
 
         <details class="devtools-panel">
@@ -1676,6 +1707,12 @@ function buildApiExample() {
   display: grid;
   gap: 0.25rem;
   font-size: 0.85rem;
+}
+
+.size-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
 }
 
 .checkbox-row {

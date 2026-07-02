@@ -4,8 +4,10 @@
  * i dots dipendono dalla risoluzione della stampante.
  */
 export const LABEL_FORMATS = [
+  { id: '40x15', name: '40 × 15 mm (piccole)', widthMm: 40, heightMm: 15 },
   { id: '40x30', name: '40 × 30 mm', widthMm: 40, heightMm: 30 },
   { id: '50x30', name: '50 × 30 mm', widthMm: 50, heightMm: 30 },
+  { id: '50x50', name: '50 × 50 mm (batterie)', widthMm: 50, heightMm: 50 },
   { id: '58x43', name: '58 × 43 mm', widthMm: 58, heightMm: 43 },
   { id: '60x40', name: '60 × 40 mm', widthMm: 60, heightMm: 40 },
   { id: '76x51', name: '76 × 51 mm (3″ × 2″)', widthMm: 76.2, heightMm: 50.8 },
