@@ -11,6 +11,7 @@ export const LABEL_FORMATS = [
   { id: '58x43', name: '58 × 43 mm', widthMm: 58, heightMm: 43 },
   { id: '60x40', name: '60 × 40 mm', widthMm: 60, heightMm: 40 },
   { id: '76x51', name: '76 × 51 mm (3″ × 2″)', widthMm: 76.2, heightMm: 50.8 },
+  { id: '76x76', name: '76 × 76 mm (3″ × 3″)', widthMm: 76.2, heightMm: 76.2 },
   { id: '100x50', name: '100 × 50 mm', widthMm: 100, heightMm: 50 },
   { id: '102x51', name: '102 × 51 mm (4″ × 2″)', widthMm: 101.6, heightMm: 50.8 },
   { id: '102x76', name: '102 × 76 mm (4″ × 3″)', widthMm: 101.6, heightMm: 76.2 },
@@ -69,22 +70,9 @@ export function applyFormat(template, formatId) {
   return true
 }
 
-/**
- * Cambia la risoluzione mantenendo le misure fisiche: riscala dimensioni
- * etichetta, posizioni e dimensioni degli elementi.
- */
-export function rescaleTemplateForDpi(template, newDpi) {
-  const oldDpi = template.dpi ?? 203
-
-  if (!newDpi || newDpi <= 0 || newDpi === oldDpi) {
-    return false
-  }
-
-  const ratio = newDpi / oldDpi
+/** Riscala posizioni e dimensioni degli elementi di un fattore uniforme. */
+export function scaleTemplateElements(template, ratio) {
   const scaled = (value, fallback) => Math.round((value ?? fallback) * ratio)
-
-  template.labelWidth = scaled(template.labelWidth, 600)
-  template.labelHeight = scaled(template.labelHeight, 400)
 
   for (const element of template.elements ?? []) {
     element.x = scaled(element.x, 0)
@@ -104,8 +92,50 @@ export function rescaleTemplateForDpi(template, newDpi) {
       element.height = Math.max(8, scaled(element.height, 80))
     }
   }
+}
 
+/**
+ * Cambia la risoluzione mantenendo le misure fisiche: riscala dimensioni
+ * etichetta, posizioni e dimensioni degli elementi.
+ */
+export function rescaleTemplateForDpi(template, newDpi) {
+  const oldDpi = template.dpi ?? 203
+
+  if (!newDpi || newDpi <= 0 || newDpi === oldDpi) {
+    return false
+  }
+
+  const ratio = newDpi / oldDpi
+  const scaled = (value, fallback) => Math.round((value ?? fallback) * ratio)
+
+  template.labelWidth = scaled(template.labelWidth, 600)
+  template.labelHeight = scaled(template.labelHeight, 400)
+  scaleTemplateElements(template, ratio)
   template.dpi = newDpi
+
+  return true
+}
+
+/**
+ * Adatta il layout a un nuovo formato: riscala gli elementi in proporzione
+ * (fattore unico, per non deformare) e imposta le nuove dimensioni.
+ */
+export function fitTemplateToSize(template, widthDots, heightDots) {
+  const oldWidth = template.labelWidth ?? 600
+  const oldHeight = template.labelHeight ?? 400
+
+  if (!widthDots || !heightDots || widthDots <= 0 || heightDots <= 0 || oldWidth <= 0 || oldHeight <= 0) {
+    return false
+  }
+
+  const ratio = Math.min(widthDots / oldWidth, heightDots / oldHeight)
+
+  if (ratio !== 1) {
+    scaleTemplateElements(template, ratio)
+  }
+
+  template.labelWidth = widthDots
+  template.labelHeight = heightDots
 
   return true
 }

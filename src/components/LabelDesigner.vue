@@ -47,6 +47,8 @@ import {
   applyFormat,
   detectFormat,
   dotsToMm,
+  findFormat,
+  fitTemplateToSize,
   mmToDots,
   rescaleTemplateForDpi,
 } from '../utils/labelFormats.js'
@@ -78,9 +80,30 @@ const dataValues = computed(() => {
 const selectedFormatId = computed({
   get: () => (template.value ? detectFormat(template.value) : CUSTOM_FORMAT_ID),
   set: (id) => {
-    if (template.value && id !== CUSTOM_FORMAT_ID) {
-      applyFormat(template.value, id)
+    if (!template.value || id === CUSTOM_FORMAT_ID) return
+
+    const format = findFormat(id)
+    if (!format) return
+
+    const dpi = template.value.dpi ?? 203
+    const widthDots = mmToDots(format.widthMm, dpi)
+    const heightDots = mmToDots(format.heightMm, dpi)
+    const sizeChanged =
+      widthDots !== template.value.labelWidth || heightDots !== template.value.labelHeight
+    const hasElements = (template.value.elements ?? []).length > 0
+
+    if (
+      sizeChanged &&
+      hasElements &&
+      window.confirm(
+        `Adatto il layout al formato ${format.name}? Gli elementi verranno riscalati in proporzione. (Annulla = cambia solo le dimensioni)`
+      )
+    ) {
+      fitTemplateToSize(template.value, widthDots, heightDots)
+      return
     }
+
+    applyFormat(template.value, id)
   },
 })
 

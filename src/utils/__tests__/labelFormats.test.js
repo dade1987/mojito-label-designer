@@ -7,8 +7,10 @@ import {
   detectFormat,
   dotsToMm,
   findFormat,
+  fitTemplateToSize,
   mmToDots,
   rescaleTemplateForDpi,
+  scaleTemplateElements,
 } from '../labelFormats.js'
 
 describe('labelFormats', () => {
@@ -115,6 +117,49 @@ describe('labelFormats', () => {
     expect(rescaleTemplateForDpi(template, 203)).toBe(false)
     expect(rescaleTemplateForDpi(template, 0)).toBe(false)
     expect(template.labelWidth).toBe(600)
+  })
+
+  it('fitTemplateToSize riscala il layout in proporzione (fattore unico)', () => {
+    const template = {
+      labelWidth: 812,
+      labelHeight: 406,
+      dpi: 203,
+      elements: [
+        { id: 't', type: 'text', x: 40, y: 40, fontHeight: 40, fontWidth: 40 },
+        { id: 'b', type: 'barcode', x: 40, y: 200, height: 100, moduleWidth: 2 },
+      ],
+    }
+
+    expect(fitTemplateToSize(template, 400, 400)).toBe(true)
+
+    // ratio = min(400/812, 400/406) = 0.4926
+    expect(template.labelWidth).toBe(400)
+    expect(template.labelHeight).toBe(400)
+    expect(template.elements[0].x).toBe(Math.round(40 * (400 / 812)))
+    expect(template.elements[0].fontHeight).toBe(Math.round(40 * (400 / 812)))
+    expect(template.elements[1].moduleWidth).toBe(1)
+  })
+
+  it('fitTemplateToSize senza riscalatura se il formato non cambia', () => {
+    const template = {
+      labelWidth: 400,
+      labelHeight: 400,
+      elements: [{ id: 't', type: 'text', x: 40, y: 40, fontHeight: 40, fontWidth: 40 }],
+    }
+
+    expect(fitTemplateToSize(template, 400, 400)).toBe(true)
+    expect(template.elements[0].fontHeight).toBe(40)
+
+    expect(fitTemplateToSize(template, 0, 400)).toBe(false)
+    expect(fitTemplateToSize({ labelWidth: 0, labelHeight: 400 }, 300, 300)).toBe(false)
+  })
+
+  it('scaleTemplateElements gestisce template senza elementi', () => {
+    const template = {}
+
+    scaleTemplateElements(template, 2)
+
+    expect(template.elements).toBeUndefined()
   })
 
   it('PRINTER_RESOLUTIONS copre CL-S700 e CL-S703', () => {
