@@ -48,6 +48,7 @@ import {
   detectFormat,
   dotsToMm,
   findFormat,
+  fitElementsToLabel,
   fitTemplateToSize,
   mmToDots,
   rescaleTemplateForDpi,
@@ -143,6 +144,18 @@ const labelHeightMm = computed({
     }
   },
 })
+
+function fitLayoutToLabel() {
+  if (!template.value) return
+
+  const fitted = fitElementsToLabel(template.value, dataValues.value)
+  showStatus(
+    fitted
+      ? 'Layout riscalato per rientrare nelle dimensioni etichetta.'
+      : "Il layout è già dentro l'etichetta.",
+    'info'
+  )
+}
 
 const selectedElement = computed(() => {
   if (selectedIds.value.length !== 1 || !template.value) return null
@@ -1254,6 +1267,9 @@ function buildApiExample() {
             <input v-model.number="template.labelHeight" type="number" min="48" />
           </label>
         </div>
+        <button type="button" class="btn ghost" @click="fitLayoutToLabel">
+          Adatta layout all'etichetta
+        </button>
         </div>
 
         <details class="devtools-panel">

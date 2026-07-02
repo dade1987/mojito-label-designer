@@ -1,3 +1,5 @@
+import { getElementBounds } from './canvasSelection.js'
+
 /**
  * Formati etichetta standard per bobine termiche compatibili con la famiglia
  * Citizen CL-S700 (larghezza di stampa max ~104 mm). Misure in millimetri;
@@ -70,9 +72,16 @@ export function applyFormat(template, formatId) {
   return true
 }
 
-/** Riscala posizioni e dimensioni degli elementi di un fattore uniforme. */
-export function scaleTemplateElements(template, ratio) {
+/**
+ * Riscala posizioni e dimensioni degli elementi di un fattore uniforme.
+ * Con floorDiscrete i valori discreti che governano la larghezza (modulo
+ * barcode, magnification QR) vengono arrotondati per difetto: serve quando
+ * si stringe un layout, dove arrotondare per eccesso lascerebbe fuori misura.
+ */
+export function scaleTemplateElements(template, ratio, floorDiscrete = false) {
   const scaled = (value, fallback) => Math.round((value ?? fallback) * ratio)
+  const scaledDiscrete = (value, fallback) =>
+    floorDiscrete ? Math.floor((value ?? fallback) * ratio) : Math.round((value ?? fallback) * ratio)
 
   for (const element of template.elements ?? []) {
     element.x = scaled(element.x, 0)
@@ -83,10 +92,10 @@ export function scaleTemplateElements(template, ratio) {
       element.fontWidth = Math.max(10, scaled(element.fontWidth, 30))
     } else if (element.type === 'barcode') {
       element.height = Math.max(20, scaled(element.height, 100))
-      element.moduleWidth = Math.max(1, scaled(element.moduleWidth, 2))
+      element.moduleWidth = Math.max(1, scaledDiscrete(element.moduleWidth, 2))
     } else if (element.type === 'qr') {
       // ^BQ accetta magnification 1-10 (vedi ZplBuilder).
-      element.magnification = Math.min(10, Math.max(1, scaled(element.magnification, 4)))
+      element.magnification = Math.min(10, Math.max(1, scaledDiscrete(element.magnification, 4)))
     } else if (element.type === 'image') {
       element.width = Math.max(8, scaled(element.width, 80))
       element.height = Math.max(8, scaled(element.height, 80))
@@ -112,6 +121,38 @@ export function rescaleTemplateForDpi(template, newDpi) {
   template.labelHeight = scaled(template.labelHeight, 400)
   scaleTemplateElements(template, ratio)
   template.dpi = newDpi
+
+  return true
+}
+
+/**
+ * Riscala gli elementi che debordano perché rientrino nelle dimensioni
+ * correnti dell'etichetta. Ritorna false se il layout è già tutto dentro.
+ */
+export function fitElementsToLabel(template, displayValues = {}) {
+  const labelWidth = template.labelWidth ?? 600
+  const labelHeight = template.labelHeight ?? 400
+
+  let maxX = 0
+  let maxY = 0
+
+  for (const element of template.elements ?? []) {
+    const bounds = getElementBounds(element, displayValues)
+    maxX = Math.max(maxX, bounds.x + bounds.width)
+    maxY = Math.max(maxY, bounds.y + bounds.height)
+  }
+
+  if (maxX <= 0 || maxY <= 0) {
+    return false
+  }
+
+  const ratio = Math.min(labelWidth / maxX, labelHeight / maxY)
+
+  if (ratio >= 1) {
+    return false
+  }
+
+  scaleTemplateElements(template, ratio, true)
 
   return true
 }

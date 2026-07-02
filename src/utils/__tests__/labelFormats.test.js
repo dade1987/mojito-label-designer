@@ -7,6 +7,7 @@ import {
   detectFormat,
   dotsToMm,
   findFormat,
+  fitElementsToLabel,
   fitTemplateToSize,
   mmToDots,
   rescaleTemplateForDpi,
@@ -152,6 +153,35 @@ describe('labelFormats', () => {
 
     expect(fitTemplateToSize(template, 0, 400)).toBe(false)
     expect(fitTemplateToSize({ labelWidth: 0, labelHeight: 400 }, 300, 300)).toBe(false)
+  })
+
+  it('fitElementsToLabel stringe il contenuto debordante', () => {
+    const template = {
+      labelWidth: 400,
+      labelHeight: 400,
+      elements: [
+        // barcode largo 422 dots a modulo 2 → deborda da 400
+        { id: 'b', type: 'barcode', x: 40, y: 200, height: 100, moduleWidth: 2, dataSource: 'v' },
+      ],
+    }
+
+    expect(fitElementsToLabel(template, { b: 'CHL13230Q20S0426' })).toBe(true)
+    expect(template.elements[0].moduleWidth).toBe(1)
+    expect(template.elements[0].x).toBeLessThan(40)
+    expect(template.labelWidth).toBe(400)
+  })
+
+  it('fitElementsToLabel non tocca layout già dentro o vuoti', () => {
+    const inside = {
+      labelWidth: 600,
+      labelHeight: 400,
+      elements: [{ id: 't', type: 'text', x: 10, y: 10, fontHeight: 30, dataSource: 'v' }],
+    }
+
+    expect(fitElementsToLabel(inside, { t: 'ciao' })).toBe(false)
+    expect(inside.elements[0].fontHeight).toBe(30)
+
+    expect(fitElementsToLabel({ labelWidth: 400, labelHeight: 400, elements: [] })).toBe(false)
   })
 
   it('scaleTemplateElements gestisce template senza elementi', () => {
