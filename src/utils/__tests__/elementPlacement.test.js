@@ -16,7 +16,7 @@ describe('elementPlacement', () => {
 
   it('defaultElementSize per tipo', () => {
     expect(defaultElementSize('text').height).toBe(38)
-    expect(defaultElementSize('barcode').height).toBe(100)
+    expect(defaultElementSize('barcode').height).toBe(130)
     expect(defaultElementSize('image').width).toBe(80)
   })
 

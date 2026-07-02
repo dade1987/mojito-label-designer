@@ -29,7 +29,8 @@ export function defaultElementSize(type) {
     case 'text':
       return { width: 120, height: 38 }
     case 'barcode':
-      return { width: 120, height: 100 }
+      // Code 128 di 6 cifre a modulo 2 (~202 dots) più riga interpretazione.
+      return { width: 210, height: 130 }
     case 'image':
       return { width: 80, height: 80 }
     default:

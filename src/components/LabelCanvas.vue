@@ -1,10 +1,11 @@
 <script setup>
 import { nextTick, ref, computed } from 'vue'
 import {
+  ZPL_FONT_FAMILY,
   buildElementDisplayValues,
-  computeBarcodeBarsStyle,
-  computeBarcodeStyle,
+  computeBarcodeMetrics,
   computeScale,
+  computeTextStyle,
   formatBarcodeValue,
   formatDisplayText,
 } from '../utils/canvasDisplay.js'
@@ -256,20 +257,37 @@ function elementStyle(element) {
 }
 
 function textStyle(element) {
-  const factor = scale.value * (element.fontHeight ?? 30) / 30
-  return {
-    fontSize: `${Math.max(10, 12 * factor)}px`,
-    fontWeight: element.bold ? '700' : '400',
-    textDecoration: element.underline ? 'underline' : 'none',
+  return computeTextStyle(element, scale.value)
+}
+
+const barcodeMetricsById = computed(() => {
+  const map = {}
+
+  for (const element of template.value.elements) {
+    if (element.type === 'barcode') {
+      map[element.id] = computeBarcodeMetrics(element, elementDisplayValues.value)
+    }
   }
+
+  return map
+})
+
+function barcodeMetrics(element) {
+  return (
+    barcodeMetricsById.value[element.id] ??
+    computeBarcodeMetrics(element, elementDisplayValues.value)
+  )
 }
 
-function barcodeStyle(element) {
-  return computeBarcodeStyle(element, elementDisplayValues.value, scale.value)
-}
+function barcodeTextStyle(element) {
+  const metrics = barcodeMetrics(element)
 
-function barcodeBarsStyle(element) {
-  return computeBarcodeBarsStyle(element, elementDisplayValues.value)
+  return {
+    fontSize: `${metrics.textFontDots * scale.value}px`,
+    marginTop: `${metrics.textGapDots * scale.value}px`,
+    fontFamily: ZPL_FONT_FAMILY,
+    lineHeight: '1',
+  }
 }
 
 function imageStyle(element) {
@@ -341,9 +359,26 @@ function displayBarcodeValue(element) {
         </template>
 
         <template v-else-if="element.type === 'barcode'">
-          <div class="barcode" :style="barcodeStyle(element)">
-            <div class="bars" :style="barcodeBarsStyle(element)"></div>
-            <small>{{ displayBarcodeValue(element) }}</small>
+          <div class="barcode">
+            <svg
+              class="bars"
+              :width="barcodeMetrics(element).widthDots * scale"
+              :height="barcodeMetrics(element).barsHeightDots * scale"
+              :viewBox="`0 0 ${barcodeMetrics(element).totalModules} 1`"
+              preserveAspectRatio="none"
+            >
+              <rect
+                v-for="(bar, index) in barcodeMetrics(element).bars"
+                :key="index"
+                :x="bar.x"
+                y="0"
+                :width="bar.width"
+                height="1"
+              />
+            </svg>
+            <small v-if="barcodeMetrics(element).showText" :style="barcodeTextStyle(element)">
+              {{ displayBarcodeValue(element) }}
+            </small>
           </div>
         </template>
 
@@ -396,27 +431,28 @@ function displayBarcodeValue(element) {
 }
 
 .element {
+  /* Niente padding/bordi: l'angolo in alto a sinistra coincide con ^FO x,y. */
   position: absolute;
   cursor: move;
   user-select: none;
-  padding: 2px;
-  border: 1px solid transparent;
+  outline: 1px dashed transparent;
+  outline-offset: 2px;
   z-index: 1;
 }
 
 .element.selected {
-  border-color: #0f9d58;
+  outline-color: #0f9d58;
   background: rgba(15, 157, 88, 0.08);
 }
 
 .element.editing {
-  border-color: #1a73e8;
+  outline-color: #1a73e8;
   background: rgba(26, 115, 232, 0.08);
 }
 
 .element.text span {
+  display: inline-block;
   white-space: nowrap;
-  font-family: monospace;
   cursor: text;
 }
 
@@ -434,20 +470,14 @@ function displayBarcodeValue(element) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  background: #fff;
-  border: 1px solid #333;
 }
 
 .barcode .bars {
-  flex: 1;
-  width: 92%;
-  margin-bottom: 4px;
+  display: block;
 }
 
-.barcode small {
-  font-size: 0.65rem;
-  font-family: monospace;
+.barcode .bars rect {
+  fill: #000;
 }
 
 .image-placeholder {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  estimateTextWidth,
   getElementBounds,
   normalizeRect,
   rectsIntersect,
@@ -31,6 +32,30 @@ describe('canvasSelection', () => {
     const selected = selectElementsInRect(elements, values, { x: 0, y: 0, width: 120, height: 120 })
 
     expect(selected).toEqual(['a'])
+  })
+
+  it('estimateTextWidth scala con fontWidth', () => {
+    expect(estimateTextWidth('AB', 30, 60)).toBe(2 * 60 * 0.55)
+    expect(estimateTextWidth('AB')).toBe(2 * 30 * 0.55)
+  })
+
+  it('getElementBounds usa le metriche reali del barcode', () => {
+    const bounds = getElementBounds(
+      { id: 'b', type: 'barcode', x: 3, y: 4, moduleWidth: 2, height: 100 },
+      { b: '123456' }
+    )
+
+    expect(bounds.width).toBe((11 * 8 + 13) * 2)
+    expect(bounds.height).toBe(100 + 5 + 20)
+  })
+
+  it('getElementBounds per tipo sconosciuto', () => {
+    expect(getElementBounds({ id: 'u', type: 'boh', x: 1, y: 2 }, {})).toEqual({
+      x: 1,
+      y: 2,
+      width: 40,
+      height: 40,
+    })
   })
 
   it('getElementBounds stima testo e immagine', () => {

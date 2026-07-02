@@ -3,8 +3,8 @@ import {
   formatDisplayText,
 } from './canvasDisplay.js'
 
-export function estimateTextWidth(text, fontHeight = 30) {
-  return Math.max(20, String(text).length * (fontHeight * 0.55))
+export function estimateTextWidth(text, fontHeight = 30, fontWidth = fontHeight) {
+  return Math.max(20, String(text).length * (fontWidth * 0.55))
 }
 
 export function getElementBounds(element, displayValues) {
@@ -14,11 +14,12 @@ export function getElementBounds(element, displayValues) {
   if (element.type === 'text') {
     const text = formatDisplayText(element, displayValues) || 'Text'
     const fontHeight = element.fontHeight ?? 30
+    const fontWidth = element.fontWidth ?? fontHeight
 
     return {
       x,
       y,
-      width: estimateTextWidth(text, fontHeight),
+      width: estimateTextWidth(text, fontHeight, fontWidth),
       height: fontHeight + 8,
     }
   }
