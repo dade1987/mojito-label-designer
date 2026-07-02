@@ -96,6 +96,32 @@ final class ZplBuilderTest extends TestCase
         $this->assertStringContainsString('NO SIZE', $zpl);
     }
 
+    public function test_render_template_with_origin_offset(): void
+    {
+        $zpl = $this->builder->renderTemplate([
+            'labelWidth' => 591,
+            'labelHeight' => 591,
+            'originX' => 24,
+            'originY' => 8,
+            'elements' => [],
+        ]);
+
+        $this->assertStringContainsString('^LH24,8', $zpl);
+    }
+
+    public function test_render_template_omits_origin_when_zero_or_negative(): void
+    {
+        $zpl = $this->builder->renderTemplate([
+            'labelWidth' => 591,
+            'labelHeight' => 591,
+            'originX' => 0,
+            'originY' => -5,
+            'elements' => [],
+        ]);
+
+        $this->assertStringNotContainsString('^LH', $zpl);
+    }
+
     public function test_render_barcode_with_show_text_disabled(): void
     {
         $zpl = $this->builder->renderTemplate([

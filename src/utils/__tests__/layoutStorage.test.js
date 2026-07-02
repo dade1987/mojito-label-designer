@@ -39,6 +39,22 @@ describe('layoutStorage', () => {
 
     expect(saved.dataSources[0]).toEqual({ name: 'barcode', label: 'Barcode', defaultValue: 'ABC' })
     expect(saved.elements[0].imageData).toBe('data:image/png;base64,AA==')
+    expect(saved.originX).toBe(0)
+    expect(saved.originY).toBe(0)
+  })
+
+  it('sanitizeTemplateForSave conserva offset origine', () => {
+    const saved = sanitizeTemplateForSave({
+      id: 't2',
+      name: 'Offset',
+      originX: 24,
+      originY: 8,
+      dataSources: [],
+      elements: [],
+    })
+
+    expect(saved.originX).toBe(24)
+    expect(saved.originY).toBe(8)
   })
 
   it('save/load/delete local layout', () => {

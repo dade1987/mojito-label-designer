@@ -21,6 +21,8 @@ export function sanitizeTemplateForSave(template) {
     labelWidth: plain.labelWidth ?? 600,
     labelHeight: plain.labelHeight ?? 400,
     dpi: plain.dpi ?? 203,
+    originX: plain.originX ?? 0,
+    originY: plain.originY ?? 0,
     dataSources: (plain.dataSources ?? []).map((source) => ({
       name: source.name,
       label: source.label ?? source.name,

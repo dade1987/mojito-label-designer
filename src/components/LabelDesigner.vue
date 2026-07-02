@@ -1270,6 +1270,20 @@ function buildApiExample() {
         <button type="button" class="btn ghost" @click="fitLayoutToLabel">
           Adatta layout all'etichetta
         </button>
+        <div class="size-row">
+          <label>
+            Offset origine X (dots)
+            <input v-model.number="template.originX" type="number" min="0" />
+          </label>
+          <label>
+            Offset origine Y (dots)
+            <input v-model.number="template.originY" type="number" min="0" />
+          </label>
+        </div>
+        <p class="hint">
+          Se la stampa esce tagliata sul bordo sinistro/alto, aumenta l'offset
+          per spostare tutto il contenuto (es. 24 dots ≈ 2 mm a 300 dpi).
+        </p>
         </div>
 
         <details class="devtools-panel">

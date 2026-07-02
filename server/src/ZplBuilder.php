@@ -53,6 +53,13 @@ final class ZplBuilder
             $lines[] = sprintf('^LL%d', $height);
         }
 
+        $originX = max(0, TypeCaster::int($template['originX'] ?? 0));
+        $originY = max(0, TypeCaster::int($template['originY'] ?? 0));
+
+        if ($originX > 0 || $originY > 0) {
+            $lines[] = sprintf('^LH%d,%d', $originX, $originY);
+        }
+
         $lines[] = '^CI28';
 
         $elements = $template['elements'] ?? [];
