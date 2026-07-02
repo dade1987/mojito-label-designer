@@ -40,6 +40,15 @@ import {
   templateToEditableJson,
   parseLayoutJsonText,
 } from '../utils/layoutStorage.js'
+import {
+  CUSTOM_FORMAT_ID,
+  LABEL_FORMATS,
+  PRINTER_RESOLUTIONS,
+  applyFormat,
+  detectFormat,
+  dotsToMm,
+  rescaleTemplateForDpi,
+} from '../utils/labelFormats.js'
 import LabelCanvas from './LabelCanvas.vue'
 
 const template = ref(null)
@@ -63,6 +72,34 @@ const clipboardElements = ref([])
 const dataValues = computed(() => {
   if (!template.value) return {}
   return buildValuesFromSources(template.value.dataSources)
+})
+
+const selectedFormatId = computed({
+  get: () => (template.value ? detectFormat(template.value) : CUSTOM_FORMAT_ID),
+  set: (id) => {
+    if (template.value && id !== CUSTOM_FORMAT_ID) {
+      applyFormat(template.value, id)
+    }
+  },
+})
+
+const selectedDpi = computed({
+  get: () => template.value?.dpi ?? 203,
+  set: (dpi) => {
+    if (template.value) {
+      rescaleTemplateForDpi(template.value, dpi)
+    }
+  },
+})
+
+const dpiOptions = computed(() => {
+  const current = selectedDpi.value
+
+  if (PRINTER_RESOLUTIONS.some((resolution) => resolution.dpi === current)) {
+    return PRINTER_RESOLUTIONS
+  }
+
+  return [{ dpi: current, label: `${current} dpi` }, ...PRINTER_RESOLUTIONS]
 })
 
 const selectedElement = computed(() => {
@@ -1135,16 +1172,33 @@ function buildApiExample() {
 
         <h2>Etichetta</h2>
         <label>
-          Larghezza (dots)
+          Formato
+          <select v-model="selectedFormatId">
+            <option v-for="format in LABEL_FORMATS" :key="format.id" :value="format.id">
+              {{ format.name }}
+            </option>
+            <option :value="CUSTOM_FORMAT_ID">Personalizzato</option>
+          </select>
+        </label>
+        <label>
+          Risoluzione stampante
+          <select v-model.number="selectedDpi">
+            <option v-for="resolution in dpiOptions" :key="resolution.dpi" :value="resolution.dpi">
+              {{ resolution.label }}
+            </option>
+          </select>
+        </label>
+        <p class="hint">
+          Cambiando risoluzione, etichetta ed elementi vengono riscalati per
+          mantenere le stesse misure in mm.
+        </p>
+        <label>
+          Larghezza (dots) · {{ dotsToMm(template.labelWidth, template.dpi) }} mm
           <input v-model.number="template.labelWidth" type="number" min="100" />
         </label>
         <label>
-          Altezza (dots)
+          Altezza (dots) · {{ dotsToMm(template.labelHeight, template.dpi) }} mm
           <input v-model.number="template.labelHeight" type="number" min="100" />
-        </label>
-        <label>
-          DPI
-          <input v-model.number="template.dpi" type="number" min="150" />
         </label>
         </div>
 

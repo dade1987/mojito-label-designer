@@ -14,6 +14,7 @@ import {
   qrPlaceholderSize,
   selectElementsInRect,
 } from '../utils/canvasSelection.js'
+import { dotsToMm } from '../utils/labelFormats.js'
 import { resolveElementValue } from '../utils/templateStore.js'
 
 const template = defineModel('template', { required: true })
@@ -316,7 +317,8 @@ function displayBarcodeValue(element) {
 <template>
   <div class="canvas-wrapper">
     <div class="canvas-meta">
-      {{ template.labelWidth }} × {{ template.labelHeight }} dots @ {{ template.dpi }} DPI
+      {{ template.labelWidth }} × {{ template.labelHeight }} dots @ {{ template.dpi }} DPI ·
+      {{ dotsToMm(template.labelWidth, template.dpi) }} × {{ dotsToMm(template.labelHeight, template.dpi) }} mm
       (scale {{ Math.round(scale * 100) }}%) · trascina area vuota per selezione multipla
     </div>
 
