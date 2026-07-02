@@ -1,10 +1,11 @@
 import {
+  TEXT_ADVANCE_RATIO,
   computeBarcodeStyle,
   formatDisplayText,
 } from './canvasDisplay.js'
 
 export function estimateTextWidth(text, fontHeight = 30, fontWidth = fontHeight) {
-  return Math.max(20, String(text).length * (fontWidth * 0.55))
+  return Math.max(20, String(text).length * (fontWidth * TEXT_ADVANCE_RATIO))
 }
 
 export function qrPlaceholderSize(element) {

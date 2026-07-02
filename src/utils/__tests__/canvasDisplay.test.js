@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   CODE128_WIDTHS,
+  FONT_CAP_TOP_EM,
+  FONT_SIZE_RATIO,
+  FONT_WIDTH_RATIO,
   buildElementDisplayValues,
   code128Bars,
   code39Bars,
@@ -135,13 +138,16 @@ describe('canvasDisplay', () => {
     expect(Number.parseInt(long.width, 10)).toBeGreaterThan(Number.parseInt(short.width, 10))
   })
 
-  it('computeTextStyle mappa fontHeight in dots ZPL', () => {
+  it('computeTextStyle mappa fontHeight con la calibrazione Triumvirate', () => {
     const style = computeTextStyle({ fontHeight: 40, fontWidth: 40 }, 1)
 
-    expect(style.fontSize).toBe('40px')
+    expect(style.fontSize).toBe(`${Math.round(40 * FONT_SIZE_RATIO * 100) / 100}px`)
     expect(style.fontWeight).toBe('700')
     expect(style.textDecoration).toBe('none')
-    expect(style.transform).toBeUndefined()
+    expect(style.transform).toBe(
+      `translateY(-${FONT_CAP_TOP_EM}em) scaleX(${Math.round(FONT_WIDTH_RATIO * 10000) / 10000})`
+    )
+    expect(style.transformOrigin).toBe('left top')
     expect(style.textShadow).toBeUndefined()
   })
 
@@ -151,9 +157,8 @@ describe('canvasDisplay', () => {
       0.5
     )
 
-    expect(style.fontSize).toBe('15px')
-    expect(style.transform).toBe('scaleX(1.5)')
-    expect(style.transformOrigin).toBe('left top')
+    expect(style.fontSize).toBe(`${Math.round(30 * FONT_SIZE_RATIO * 0.5 * 100) / 100}px`)
+    expect(style.transform).toContain(`scaleX(${Math.round(1.5 * FONT_WIDTH_RATIO * 10000) / 10000})`)
     expect(style.textShadow).toBe('0.5px 0 0 currentColor')
     expect(style.textDecoration).toBe('underline')
   })
@@ -161,7 +166,13 @@ describe('canvasDisplay', () => {
   it('computeTextStyle usa i default ZPL (30 dots)', () => {
     const style = computeTextStyle({})
 
-    expect(style.fontSize).toBe('30px')
-    expect(style.transform).toBeUndefined()
+    expect(style.fontSize).toBe(`${Math.round(30 * FONT_SIZE_RATIO * 100) / 100}px`)
+  })
+
+  it('la calibrazione riproduce le misure Labelary di riferimento', () => {
+    // A fontHeight 100: cap-height resa = 100 × ratio × (72/100 cap Roboto) ≈ 77
+    expect(100 * FONT_SIZE_RATIO * 0.72).toBeCloseTo(77, 1)
+    // Campione largo 1057px a 100px → con size ratio e scaleX torna 1064 dots
+    expect(10.57 * FONT_SIZE_RATIO * FONT_WIDTH_RATIO * 100).toBeCloseTo(1064, 0)
   })
 })

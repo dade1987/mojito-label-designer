@@ -36,8 +36,8 @@ describe('canvasSelection', () => {
   })
 
   it('estimateTextWidth scala con fontWidth', () => {
-    expect(estimateTextWidth('AB', 30, 60)).toBe(2 * 60 * 0.55)
-    expect(estimateTextWidth('AB')).toBe(2 * 30 * 0.55)
+    expect(estimateTextWidth('AB', 30, 60)).toBe(2 * 60 * 0.51)
+    expect(estimateTextWidth('AB')).toBe(2 * 30 * 0.51)
   })
 
   it('getElementBounds usa le metriche reali del barcode', () => {

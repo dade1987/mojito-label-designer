@@ -1,12 +1,25 @@
 import { resolveElementValue } from './templateStore.js'
 
 /**
- * Il font 0 ZPL è CG Triumvirate Bold Condensed: nel browser lo approssimiamo
- * con un sans-serif condensed in grassetto, così le larghezze in anteprima
- * restano vicine a quelle stampate.
+ * Il font 0 ZPL è CG Triumvirate Bold Condensed: nel browser usiamo Roboto
+ * Condensed Bold (impacchettato via @fontsource, vedi main.js) che gli è
+ * quasi identico nelle metriche. I fallback di sistema sono più larghi.
  */
 export const ZPL_FONT_FAMILY =
-  "'Arial Narrow', 'Liberation Sans Narrow', 'Roboto Condensed', 'Helvetica Neue', Arial, sans-serif"
+  "'Roboto Condensed', 'Liberation Sans Narrow', 'Arial Narrow', Arial, sans-serif"
+
+/**
+ * Calibrazione empirica contro Labelary (^A0N,100,100):
+ * CG Triumvirate: cap-height 77, campione "CMBGREENENERGY S.R.L." = 1064 dots.
+ * Roboto Condensed Bold a 100px: cap-height 72, stesso campione = 1057 px,
+ * cap top a 0.125em dal bordo superiore della riga (ZPL parte da 0).
+ */
+export const FONT_SIZE_RATIO = 77 / 72
+export const FONT_WIDTH_RATIO = 1064 / 1057 / FONT_SIZE_RATIO
+export const FONT_CAP_TOP_EM = 0.125
+
+/** Avanzamento medio per carattere rispetto a fontWidth (campione / 21 / 100). */
+export const TEXT_ADVANCE_RATIO = 0.51
 
 const CODE128_START_B = 104
 const CODE128_STOP = 106
@@ -59,31 +72,31 @@ export function formatBarcodeValue(element, displayValues) {
 }
 
 /**
- * Stile testo fedele allo ZPL: ^A0N,h,w disegna un carattere alto h dots,
- * quindi il font-size CSS è h × scala. La larghezza w si ottiene con scaleX.
+ * Stile testo fedele allo ZPL: ^A0N,h,w disegna un carattere con cap-height
+ * 0.77×h a partire da y. Font-size, scala orizzontale e traslazione verticale
+ * compensano le differenze di metrica tra Roboto Condensed e CG Triumvirate.
  */
 export function computeTextStyle(element, scale = 1) {
   const fontHeight = element.fontHeight ?? 30
   const fontWidth = element.fontWidth ?? fontHeight
   const stretch = fontHeight > 0 && fontWidth > 0 ? fontWidth / fontHeight : 1
 
+  const fontSize = Math.round(fontHeight * FONT_SIZE_RATIO * scale * 100) / 100
+  const scaleX = Math.round(stretch * FONT_WIDTH_RATIO * 10000) / 10000
+
   const style = {
-    fontSize: `${fontHeight * scale}px`,
+    fontSize: `${fontSize}px`,
     lineHeight: '1',
     fontFamily: ZPL_FONT_FAMILY,
     fontWeight: '700',
-    fontStretch: 'condensed',
     textDecoration: element.underline ? 'underline' : 'none',
+    transform: `translateY(-${FONT_CAP_TOP_EM}em) scaleX(${scaleX})`,
+    transformOrigin: 'left top',
   }
 
   if (element.bold) {
     // Il builder ZPL simula il grassetto ristampando il testo spostato di 1 dot.
     style.textShadow = `${scale}px 0 0 currentColor`
-  }
-
-  if (stretch !== 1) {
-    style.transform = `scaleX(${stretch})`
-    style.transformOrigin = 'left top'
   }
 
   return style
