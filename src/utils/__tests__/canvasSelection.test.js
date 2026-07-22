@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  cycleStackSelection,
+  elementsAtPoint,
   estimateTextWidth,
   getElementBounds,
   normalizeRect,
+  pointInBounds,
   qrPlaceholderSize,
   rectsIntersect,
   selectElementsInRect,
@@ -88,5 +91,40 @@ describe('canvasSelection', () => {
       width: 50,
       height: 50,
     })
+  })
+
+  it('pointInBounds include i bordi ed esclude i punti fuori', () => {
+    const bounds = { x: 10, y: 10, width: 20, height: 20 }
+    expect(pointInBounds({ x: 10, y: 10 }, bounds)).toBe(true)
+    expect(pointInBounds({ x: 30, y: 30 }, bounds)).toBe(true)
+    expect(pointInBounds({ x: 20, y: 20 }, bounds)).toBe(true)
+    expect(pointInBounds({ x: 31, y: 20 }, bounds)).toBe(false)
+    expect(pointInBounds({ x: 5, y: 20 }, bounds)).toBe(false)
+  })
+
+  it('elementsAtPoint restituisce gli id sovrapposti in ordine di stacking', () => {
+    const elements = [
+      { id: 'sotto', type: 'image', x: 0, y: 0, width: 100, height: 100 },
+      { id: 'sopra', type: 'image', x: 40, y: 40, width: 100, height: 100 },
+      { id: 'lontano', type: 'image', x: 300, y: 300, width: 20, height: 20 },
+    ]
+
+    expect(elementsAtPoint(elements, {}, { x: 50, y: 50 })).toEqual(['sotto', 'sopra'])
+    expect(elementsAtPoint(elements, {}, { x: 10, y: 10 })).toEqual(['sotto'])
+    expect(elementsAtPoint(elements, {}, { x: 500, y: 500 })).toEqual([])
+    expect(elementsAtPoint(null, {}, { x: 0, y: 0 })).toEqual([])
+  })
+
+  it('cycleStackSelection scende di un livello con wrap in cima', () => {
+    const stack = ['sotto', 'mezzo', 'sopra']
+    // dall'elemento in cima si scende a quello subito sotto
+    expect(cycleStackSelection(stack, 'sopra')).toBe('mezzo')
+    expect(cycleStackSelection(stack, 'mezzo')).toBe('sotto')
+    // dal fondo si torna in cima (wrap)
+    expect(cycleStackSelection(stack, 'sotto')).toBe('sopra')
+    // selezione non nello stack → parte dall'elemento in cima
+    expect(cycleStackSelection(stack, 'altro')).toBe('sopra')
+    expect(cycleStackSelection([], 'x')).toBeNull()
+    expect(cycleStackSelection(null, 'x')).toBeNull()
   })
 })

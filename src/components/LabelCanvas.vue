@@ -10,6 +10,8 @@ import {
   formatDisplayText,
 } from '../utils/canvasDisplay.js'
 import {
+  cycleStackSelection,
+  elementsAtPoint,
   normalizeRect,
   qrPlaceholderSize,
   selectElementsInRect,
@@ -151,8 +153,20 @@ function startDrag(event, element) {
     return
   }
 
-  if (!isSelected(element.id)) {
-    setSelection([element.id])
+  // Alt+clic: raggiungi l'elemento sotto quello in cima nel punto cliccato,
+  // così elementi sovrapposti restano selezionabili/spostabili singolarmente.
+  let targetId = element.id
+  if (event.altKey) {
+    const point = clientToCanvasDots(event.clientX, event.clientY)
+    const stack = elementsAtPoint(template.value.elements, elementDisplayValues.value, point)
+    const current = selectedIds.value.length === 1 ? selectedIds.value[0] : element.id
+    targetId = cycleStackSelection(stack, current) ?? element.id
+  }
+
+  const targetElement = template.value.elements.find((item) => item.id === targetId) ?? element
+
+  if (!isSelected(targetId)) {
+    setSelection([targetId])
   }
 
   const rect = canvasRef.value.getBoundingClientRect()
@@ -168,9 +182,9 @@ function startDrag(event, element) {
 
   groupDrag.value = {
     starts,
-    anchorId: element.id,
-    offsetX: pointerX - element.x,
-    offsetY: pointerY - element.y,
+    anchorId: targetId,
+    offsetX: pointerX - targetElement.x,
+    offsetY: pointerY - targetElement.y,
   }
 
   window.addEventListener('mousemove', onDrag)
@@ -241,6 +255,12 @@ function setEditInputRef(element, node) {
 }
 
 function onElementClick(event, id) {
+  // La selezione con Alt (elemento sottostante) è gestita in startDrag: qui la
+  // ignoriamo, altrimenti il click finale ri-selezionerebbe quello in cima.
+  if (event.altKey) {
+    return
+  }
+
   if (event.shiftKey) {
     toggleSelection(id)
     return
@@ -460,11 +480,15 @@ function displayBarcodeValue(element) {
 .element.selected {
   outline-color: #0f9d58;
   background: rgba(15, 157, 88, 0.08);
+  /* L'elemento selezionato passa sopra gli altri: così, se un nuovo elemento
+     nasce sopra un altro, lo si può afferrare e spostare senza incastri. */
+  z-index: 3;
 }
 
 .element.editing {
   outline-color: #1a73e8;
   background: rgba(26, 115, 232, 0.08);
+  z-index: 4;
 }
 
 .element.text span {
