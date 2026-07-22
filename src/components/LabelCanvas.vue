@@ -1,13 +1,13 @@
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref, computed } from 'vue'
+import { nextTick, ref, computed } from 'vue'
 import {
   BARCODE_TEXT_FONT_FAMILY,
   buildElementDisplayValues,
   computeBarcodeMetrics,
-  computeFitScale,
   computeTextStyle,
   formatBarcodeValue,
   formatDisplayText,
+  physicalDotScale,
 } from '../utils/canvasDisplay.js'
 import {
   cycleStackSelection,
@@ -32,52 +32,38 @@ const props = defineProps({
 })
 
 const canvasRef = ref(null)
-const wrapperRef = ref(null)
 const groupDrag = ref(null)
 const editingId = ref(null)
 const editValue = ref('')
 const editInputRef = ref(null)
 const marquee = ref(null)
 
-// Spazio realmente disponibile per il canvas (misurato): serve ad adattare
-// l'etichetta alla risoluzione/finestra invece di tenerla a dimensione fissa.
-const availWidth = ref(0)
-const availHeight = ref(0)
-let resizeObserver = null
+// Zoom scelto dall'utente: 1 = dimensione reale (grande come su carta).
+const ZOOM_MIN = 0.25
+const ZOOM_MAX = 6
+const ZOOM_STEP = 1.25
+const zoom = ref(1)
 
-function measureAvailable() {
-  const wrapper = wrapperRef.value
-  if (!wrapper) return
+// px CSS per dot alla dimensione reale, indipendente dalla risoluzione.
+const baseScale = computed(() => physicalDotScale(template.value.dpi))
+const scale = computed(() => baseScale.value * zoom.value)
+const zoomPercent = computed(() => Math.round(zoom.value * 100))
 
-  const area = wrapper.parentElement
-  // margini di sicurezza: padding dell'area + riga meta sopra il canvas.
-  availWidth.value = Math.max(0, (wrapper.clientWidth || 0) - 24)
-  availHeight.value = Math.max(0, (area ? area.clientHeight : 0) - 56)
+function clampZoom(value) {
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value))
 }
 
-onMounted(() => {
-  measureAvailable()
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(measureAvailable)
-    if (wrapperRef.value) resizeObserver.observe(wrapperRef.value)
-    if (wrapperRef.value?.parentElement) resizeObserver.observe(wrapperRef.value.parentElement)
-  }
-  window.addEventListener('resize', measureAvailable)
-})
+function zoomIn() {
+  zoom.value = clampZoom(zoom.value * ZOOM_STEP)
+}
 
-onBeforeUnmount(() => {
-  resizeObserver?.disconnect()
-  window.removeEventListener('resize', measureAvailable)
-})
+function zoomOut() {
+  zoom.value = clampZoom(zoom.value / ZOOM_STEP)
+}
 
-const scale = computed(() =>
-  computeFitScale(
-    template.value.labelWidth,
-    template.value.labelHeight,
-    availWidth.value,
-    availHeight.value
-  )
-)
+function zoomReal() {
+  zoom.value = 1
+}
 
 const canvasStyle = computed(() => ({
   width: `${template.value.labelWidth * scale.value}px`,
@@ -375,11 +361,23 @@ function displayBarcodeValue(element) {
 </script>
 
 <template>
-  <div ref="wrapperRef" class="canvas-wrapper">
+  <div class="canvas-wrapper">
     <div class="canvas-meta">
-      {{ template.labelWidth }} × {{ template.labelHeight }} dots @ {{ template.dpi }} DPI ·
-      {{ dotsToMm(template.labelWidth, template.dpi) }} × {{ dotsToMm(template.labelHeight, template.dpi) }} mm
-      (scale {{ Math.round(scale * 100) }}%) · trascina area vuota per selezione multipla
+      <span class="meta-dims">
+        {{ template.labelWidth }} × {{ template.labelHeight }} dots @ {{ template.dpi }} DPI ·
+        {{ dotsToMm(template.labelWidth, template.dpi) }} × {{ dotsToMm(template.labelHeight, template.dpi) }} mm
+      </span>
+      <span class="zoom-ctrl" role="group" aria-label="Zoom anteprima">
+        <button type="button" title="Riduci zoom" aria-label="Riduci zoom" @click="zoomOut">−</button>
+        <button
+          type="button"
+          class="zoom-value"
+          title="Torna alla dimensione reale (come su carta)"
+          @click="zoomReal"
+        >{{ zoomPercent }}%</button>
+        <button type="button" title="Aumenta zoom" aria-label="Aumenta zoom" @click="zoomIn">+</button>
+      </span>
+      <span class="meta-hint">trascina area vuota per selezione multipla</span>
     </div>
 
     <div
@@ -486,6 +484,50 @@ function displayBarcodeValue(element) {
   font-size: 0.85rem;
   color: #666;
   text-align: center;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 0.9rem;
+}
+
+.zoom-ctrl {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid #d0d0d0;
+  border-radius: 7px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.zoom-ctrl button {
+  border: none;
+  background: #fff;
+  color: #333;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0.25rem 0.55rem;
+  cursor: pointer;
+}
+
+.zoom-ctrl button:hover {
+  background: #f0f0f0;
+}
+
+.zoom-ctrl button:focus-visible {
+  outline: 2px solid #0f9d58;
+  outline-offset: -2px;
+}
+
+.zoom-ctrl .zoom-value {
+  min-width: 3.4rem;
+  font-variant-numeric: tabular-nums;
+  border-inline: 1px solid #e5e5e5;
+  font-weight: 600;
+}
+
+.meta-hint {
+  color: #999;
 }
 
 .canvas {

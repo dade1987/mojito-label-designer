@@ -61,34 +61,19 @@ export function computeScale(labelWidth, maxWidth = 700) {
   return Math.min(1, maxWidth / width)
 }
 
+/** Pixel CSS per pollice: costante di riferimento CSS (1in = 96px). */
+export const CSS_PX_PER_INCH = 96
+
 /**
- * Scala che adatta l'etichetta allo spazio realmente disponibile (larghezza e
- * altezza dell'area canvas), così il preview cresce sugli schermi grandi e si
- * riduce su quelli piccoli invece di restare sempre della stessa dimensione.
- * Mantiene le proporzioni (scala uniforme). `maxScale` evita ingrandimenti
- * assurdi/sfocati; se non conosciamo ancora l'area disponibile si usa il vecchio
- * cap a `fallbackMax` px di larghezza.
+ * Scala "dimensione reale": px CSS per ogni dot, così l'etichetta a schermo è
+ * grande quanto su carta ed è STABILE su ogni risoluzione (i px CSS sono unità
+ * di riferimento, indipendenti dai px fisici del monitor: è questo che prima la
+ * faceva sembrare di dimensioni diverse). 1 dot = 1/dpi pollici = 96/dpi px CSS.
+ * Il risultato va poi moltiplicato per il fattore di zoom scelto dall'utente.
  */
-export function computeFitScale(
-  labelWidth,
-  labelHeight,
-  availWidth,
-  availHeight,
-  maxScale = 3,
-  fallbackMax = 700
-) {
-  const width = labelWidth || 600
-  const height = labelHeight || 400
-
-  if (!availWidth || availWidth <= 0) {
-    return Math.min(1, fallbackMax / width)
-  }
-
-  const byWidth = availWidth / width
-  const scale =
-    availHeight && availHeight > 0 ? Math.min(byWidth, availHeight / height) : byWidth
-
-  return Math.max(0.1, Math.min(maxScale, scale))
+export function physicalDotScale(dpi) {
+  const resolution = dpi || 203
+  return CSS_PX_PER_INCH / resolution
 }
 
 export function buildElementDisplayValues(elements, dataValues, dataSources) {

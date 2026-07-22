@@ -9,9 +9,9 @@ import {
   code39Bars,
   computeBarcodeMetrics,
   computeBarcodeStyle,
-  computeFitScale,
   computeScale,
   computeTextStyle,
+  physicalDotScale,
   encodeCode128,
   formatBarcodeValue,
   formatDisplayText,
@@ -35,20 +35,15 @@ describe('canvasDisplay', () => {
     expect(computeScale(600, 300)).toBe(0.5)
   })
 
-  it('computeFitScale adatta l\'etichetta allo spazio disponibile', () => {
-    // limitato dalla larghezza disponibile
-    expect(computeFitScale(600, 400, 300, 10000)).toBe(0.5)
-    // ingrandisce sugli schermi grandi (limite = larghezza)
-    expect(computeFitScale(600, 400, 1200, 10000)).toBe(2)
-    // limitato dall'altezza disponibile
-    expect(computeFitScale(600, 400, 10000, 400)).toBe(1)
-    // cap massimo per evitare ingrandimenti assurdi
-    expect(computeFitScale(100, 100, 100000, 100000)).toBe(3)
-    // senza area nota: fallback al vecchio cap a 700px
-    expect(computeFitScale(1400, 400, 0, 0)).toBe(0.5)
-    expect(computeFitScale(600, 400, 0, 0)).toBe(1)
-    // ignora l'altezza se non nota
-    expect(computeFitScale(600, 400, 900, 0)).toBe(1.5)
+  it('physicalDotScale rende la dimensione reale indipendente dalla risoluzione', () => {
+    // 1 dot = 96/dpi px CSS
+    expect(physicalDotScale(96)).toBe(1)
+    expect(physicalDotScale(203)).toBeCloseTo(96 / 203, 6)
+    expect(physicalDotScale(300)).toBeCloseTo(0.32, 6)
+    // 80 mm @ 300 dpi = 945 dots → ~302 px CSS (≈ 80 mm reali)
+    expect(945 * physicalDotScale(300)).toBeCloseTo(302.4, 1)
+    // dpi mancante → default 203
+    expect(physicalDotScale(0)).toBeCloseTo(96 / 203, 6)
   })
 
   it('buildElementDisplayValues gestisce input vuoti', () => {
