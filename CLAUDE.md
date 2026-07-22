@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-Mojito is a ZPL label designer for a **Citizen CL-S703Z** printer (BarTender-like drag-and-drop UI): position text, barcode (with named data sources), and image elements on a label, preview the generated ZPL, and print via CUPS (`lp -o raw`) or Windows raw printing.
+Mojito is a ZPL label designer for thermal label printers (drag-and-drop UI): position text, barcode (with named data sources), and image elements on a label, preview the generated ZPL, and print via CUPS (`lp -o raw`) or Windows raw printing.
 
 It is a standalone project (own git repo) but **deploys into** the `GreenEnergyServer` Laravel app as a station app — see "Deploy" below. `GreenEnergyServer` lives as a sibling directory (`../GreenEnergyServer`) when both repos are checked out side by side.
 

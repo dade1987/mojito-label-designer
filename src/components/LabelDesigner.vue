@@ -869,7 +869,7 @@ function buildApiExample() {
         <span class="logo">🍹</span>
         <div>
           <h1>Mojito Label Designer</h1>
-          <p>POC ZPL · Citizen CL-S700 / CL-S703Z</p>
+          <p>Designer etichette ZPL</p>
         </div>
       </div>
 

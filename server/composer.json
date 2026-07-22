@@ -1,6 +1,6 @@
 {
     "name": "mojito/label-server",
-    "description": "POC stampa etichette ZPL via CUPS per Citizen CL-S700",
+    "description": "Stampa etichette ZPL via CUPS",
     "type": "project",
     "license": "MIT",
     "require": {

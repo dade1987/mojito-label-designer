@@ -8,7 +8,7 @@
     "name": "Mojito",
     "email": "info@mojito.local"
   },
-  "description": "POC designer etichette ZPL - Citizen CL-S700",
+  "description": "Designer etichette ZPL drag-and-drop, self-hosted",
   "scripts": {
     "dev": "vite",
     "dev:server": "cd server && composer serve",
