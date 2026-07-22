@@ -1,7 +1,7 @@
 <script setup>
 import { nextTick, ref, computed } from 'vue'
 import {
-  ZPL_FONT_FAMILY,
+  BARCODE_TEXT_FONT_FAMILY,
   buildElementDisplayValues,
   computeBarcodeMetrics,
   computeScale,
@@ -287,7 +287,8 @@ function barcodeTextStyle(element) {
   return {
     fontSize: `${metrics.textFontDots * scale.value}px`,
     marginTop: `${metrics.textGapDots * scale.value}px`,
-    fontFamily: ZPL_FONT_FAMILY,
+    fontFamily: BARCODE_TEXT_FONT_FAMILY,
+    fontWeight: '400',
     lineHeight: '1',
   }
 }

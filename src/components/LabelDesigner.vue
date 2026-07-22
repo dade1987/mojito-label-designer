@@ -53,6 +53,7 @@ import {
   mmToDots,
   rescaleTemplateForDpi,
 } from '../utils/labelFormats.js'
+import { generateId } from '../utils/id.js'
 import LabelCanvas from './LabelCanvas.vue'
 
 const template = ref(null)
@@ -267,7 +268,7 @@ function ensurePrinterSelected() {
 function hydrateTemplate(raw) {
   return {
     ...raw,
-    id: raw.id ?? crypto.randomUUID(),
+    id: raw.id ?? generateId(),
     dataSources: (raw.dataSources ?? []).map((source) => ({
       name: source.name,
       label: source.label ?? source.name,

@@ -1,5 +1,6 @@
 import { cloneTemplateState } from './cloneSerializable.js'
 import { findEmptyPlacement, placeNewElement } from './elementPlacement.js'
+import { generateId } from './id.js'
 
 const DUPLICATE_OFFSET = 20
 const DATA_BOUND_TYPES = ['text', 'barcode', 'qr']
@@ -37,7 +38,7 @@ export function createEmptyTemplate() {
 }
 
 export function createElement(type, x = 0, y = 0) {
-  const id = crypto.randomUUID()
+  const id = generateId()
 
   const base = { id, type, x, y }
 
@@ -338,7 +339,7 @@ export function duplicateElementInTemplate(
   offset = DUPLICATE_OFFSET
 ) {
   const clone = cloneTemplateState(source)
-  clone.id = crypto.randomUUID()
+  clone.id = generateId()
 
   const preferred = {
     x: (source.x ?? 0) + offset,

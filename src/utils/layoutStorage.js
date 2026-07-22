@@ -1,4 +1,5 @@
 import { cloneTemplateState } from './cloneSerializable.js'
+import { generateId } from './id.js'
 import {
   buildValuesFromSources,
   ensureElementDataSource,
@@ -16,7 +17,7 @@ export function sanitizeTemplateForSave(template) {
   const plain = cloneTemplateState(template)
 
   return {
-    id: plain.id ?? crypto.randomUUID(),
+    id: plain.id ?? generateId(),
     name: plain.name ?? 'Etichetta senza nome',
     labelWidth: plain.labelWidth ?? 600,
     labelHeight: plain.labelHeight ?? 400,
@@ -139,7 +140,7 @@ function parseLayoutFile(parsed, filePath = null) {
 
   return {
     ...parsed,
-    id: parsed.id ?? crypto.randomUUID(),
+    id: parsed.id ?? generateId(),
     filePath,
     dataSources: (parsed.dataSources ?? []).map((source) => ({
       name: source.name,

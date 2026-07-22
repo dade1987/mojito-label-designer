@@ -9,6 +9,15 @@ export const ZPL_FONT_FAMILY =
   "'Roboto Condensed', 'Liberation Sans Narrow', 'Arial Narrow', Arial, sans-serif"
 
 /**
+ * La riga interpretativa del barcode NON usa il font ^A0 degli altri testi:
+ * la Citizen la disegna con il proprio font interno per i barcode, un sans
+ * piano non condensato. In anteprima usiamo quindi un sans proporzionale
+ * standard (niente Roboto Condensed) per assomigliargli.
+ */
+export const BARCODE_TEXT_FONT_FAMILY =
+  "Arial, 'Liberation Sans', 'Helvetica Neue', Helvetica, sans-serif"
+
+/**
  * Calibrazione empirica contro Labelary (^A0N,100,100):
  * CG Triumvirate: cap-height 77, campione "CMBGREENENERGY S.R.L." = 1064 dots.
  * Roboto Condensed Bold a 100px: cap-height 72, stesso campione = 1057 px,
