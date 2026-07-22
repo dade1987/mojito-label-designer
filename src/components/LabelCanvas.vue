@@ -7,8 +7,13 @@ import {
   computeTextStyle,
   formatBarcodeValue,
   formatDisplayText,
-  physicalDotScale,
 } from '../utils/canvasDisplay.js'
+import {
+  DEFAULT_PX_PER_MM,
+  getScreenPxPerMm,
+  resetScreenCalibration,
+  setScreenPxPerMm,
+} from '../utils/screenCalibration.js'
 import {
   cycleStackSelection,
   elementsAtPoint,
@@ -44,10 +49,31 @@ const ZOOM_MAX = 6
 const ZOOM_STEP = 1.25
 const zoom = ref(1)
 
-// px CSS per dot alla dimensione reale, indipendente dalla risoluzione.
-const baseScale = computed(() => physicalDotScale(template.value.dpi))
+// px CSS per mm dello schermo (calibrabile col righello per la dimensione reale).
+const pxPerMm = ref(getScreenPxPerMm())
+const showCalibration = ref(false)
+// Larghezza/altezza di una carta ISO (bancomat/credito): riferimento comodo.
+const CARD_MM_W = 85.6
+const CARD_MM_H = 53.98
+
+// px CSS per dot = px/mm × mm/dot; a zoom 1 l'etichetta è a dimensione reale.
+const baseScale = computed(() => (pxPerMm.value * 25.4) / (template.value.dpi || 203))
 const scale = computed(() => baseScale.value * zoom.value)
 const zoomPercent = computed(() => Math.round(zoom.value * 100))
+const cardStyle = computed(() => ({
+  width: `${CARD_MM_W * pxPerMm.value}px`,
+  height: `${CARD_MM_H * pxPerMm.value}px`,
+}))
+
+function saveCalibration() {
+  setScreenPxPerMm(pxPerMm.value)
+  showCalibration.value = false
+}
+
+function resetCalibration() {
+  resetScreenCalibration()
+  pxPerMm.value = DEFAULT_PX_PER_MM
+}
 
 function clampZoom(value) {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value))
@@ -377,7 +403,40 @@ function displayBarcodeValue(element) {
         >{{ zoomPercent }}%</button>
         <button type="button" title="Aumenta zoom" aria-label="Aumenta zoom" @click="zoomIn">+</button>
       </span>
+      <button
+        type="button"
+        class="cal-toggle"
+        :class="{ active: showCalibration }"
+        title="Calibra la dimensione reale dello schermo"
+        @click="showCalibration = !showCalibration"
+      >📐 Calibra</button>
       <span class="meta-hint">trascina area vuota per selezione multipla</span>
+    </div>
+
+    <div v-if="showCalibration" class="calibrate">
+      <p class="cal-text">
+        Appoggia allo schermo una carta (bancomat/credito, <b>85,6 mm</b>) e regola il cursore
+        finché il rettangolo è largo esattamente come la carta. Poi salva: al <b>100%</b> di zoom
+        l'etichetta sarà a dimensione reale.
+      </p>
+      <div class="cal-card" :style="cardStyle"><span>85,6 × 54 mm</span></div>
+      <div class="cal-row">
+        <input
+          type="range"
+          min="2.4"
+          max="9"
+          step="0.01"
+          :value="pxPerMm"
+          aria-label="Calibrazione px per mm"
+          @input="pxPerMm = Number($event.target.value)"
+        />
+        <span class="cal-val">{{ pxPerMm.toFixed(2) }} px/mm</span>
+      </div>
+      <div class="cal-actions">
+        <button type="button" class="cal-save" @click="saveCalibration">Salva</button>
+        <button type="button" @click="resetCalibration">Reimposta</button>
+        <button type="button" @click="showCalibration = false">Chiudi</button>
+      </div>
     </div>
 
     <div
@@ -420,9 +479,7 @@ function displayBarcodeValue(element) {
             :style="textStyle(element)"
             title="Doppio clic per modificare"
             @dblclick.stop.prevent="startTextEdit($event, element)"
-          >
-            {{ displayText(element) || '(testo)' }}
-          </span>
+          >{{ displayText(element) || '(testo)' }}</span>
         </template>
 
         <template v-else-if="element.type === 'barcode'">
@@ -530,6 +587,98 @@ function displayBarcodeValue(element) {
   color: #999;
 }
 
+.cal-toggle {
+  border: 1px solid #d0d0d0;
+  border-radius: 7px;
+  background: #fff;
+  color: #333;
+  font-size: 0.8rem;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+}
+
+.cal-toggle:hover { background: #f0f0f0; }
+.cal-toggle.active { border-color: #0f9d58; color: #0f9d58; }
+
+.calibrate {
+  width: min(520px, 92%);
+  border: 1px solid #d7ddd9;
+  border-radius: 12px;
+  background: #fafbfa;
+  padding: 1rem 1.1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  box-shadow: 0 6px 20px -12px rgba(0, 0, 0, 0.35);
+}
+
+.cal-text {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #555;
+  text-align: center;
+  line-height: 1.45;
+}
+
+.cal-card {
+  border: 2px solid #0f9d58;
+  border-radius: 10px;
+  background: repeating-linear-gradient(-45deg, #eef6f1 0 8px, #e4f0ea 8px 16px);
+  display: grid;
+  place-items: center;
+  min-width: 40px;
+  min-height: 26px;
+}
+
+.cal-card span {
+  font-size: 0.72rem;
+  color: #0b7a41;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.75);
+  padding: 1px 6px;
+  border-radius: 5px;
+}
+
+.cal-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.cal-row input[type="range"] { flex: 1; accent-color: #0f9d58; }
+
+.cal-val {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  color: #444;
+  min-width: 6.5rem;
+  text-align: right;
+}
+
+.cal-actions { display: flex; gap: 0.5rem; }
+
+.cal-actions button {
+  border: 1px solid #cfcfcf;
+  background: #fff;
+  border-radius: 7px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.cal-actions button:hover { background: #f2f2f2; }
+
+.cal-actions .cal-save {
+  background: #0f9d58;
+  border-color: #0f9d58;
+  color: #fff;
+  font-weight: 600;
+}
+
+.cal-actions .cal-save:hover { background: #0c8a4c; }
+
 .canvas {
   position: relative;
   background: #fff;
@@ -574,7 +723,10 @@ function displayBarcodeValue(element) {
 
 .element.text span {
   display: inline-block;
-  white-space: nowrap;
+  /* pre (non nowrap): preserva gli spazi multipli come fa la stampante,
+     altrimenti "46.8 V    6Ah" verrebbe collassato e la scritta risulterebbe
+     più stretta a schermo che in stampa. */
+  white-space: pre;
   cursor: text;
 }
 
