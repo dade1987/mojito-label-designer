@@ -423,14 +423,25 @@ function displayBarcodeValue(element) {
       <div class="cal-row">
         <input
           type="range"
-          min="2.4"
-          max="9"
-          step="0.01"
+          min="0.3"
+          max="16"
+          step="0.02"
           :value="pxPerMm"
           aria-label="Calibrazione px per mm"
           @input="pxPerMm = Number($event.target.value)"
         />
-        <span class="cal-val">{{ pxPerMm.toFixed(2) }} px/mm</span>
+        <span class="cal-val">
+          <input
+            type="number"
+            min="0.2"
+            max="40"
+            step="0.05"
+            :value="pxPerMm.toFixed(2)"
+            aria-label="px per mm"
+            @input="pxPerMm = Number($event.target.value) || pxPerMm"
+          />
+          px/mm
+        </span>
       </div>
       <div class="cal-actions">
         <button type="button" class="cal-save" @click="saveCalibration">Salva</button>
@@ -655,6 +666,20 @@ function displayBarcodeValue(element) {
   color: #444;
   min-width: 6.5rem;
   text-align: right;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+
+.cal-val input[type="number"] {
+  width: 4.2rem;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid #cfcfcf;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .cal-actions { display: flex; gap: 0.5rem; }
