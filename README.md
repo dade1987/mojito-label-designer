@@ -1,244 +1,179 @@
-# Mojito — Label Designer POC
+# 🍹 Mojito — Label Designer
 
-POC di interfaccia per la stampa etichette ZPL su **Citizen CL-S703Z** (famiglia CL-S700), simile a BarTender: posizionamento di testi, barcode con named data sources e immagini.
+**Progetta, anteprima e stampa etichette industriali ZPL direttamente dal browser.**
+Un editor drag‑and‑drop tipo BarTender, ma leggero, self‑hosted e open: niente driver proprietari, niente licenze a postazione, niente PDF intermedi — solo ZPL puro inviato alla stampante.
 
-## Stack
+> Pensato per stampanti **Citizen CL‑S700 / CL‑S703Z** (emulazione ZPL II) e compatibile con qualsiasi stampante termica che parla ZPL (Zebra, ecc.).
 
-- **Frontend**: Vue 3 + Vite (+ Electron opzionale), come GreenEnergy_Client
-- **Backend**: PHP 8.2 — generazione ZPL e invio a CUPS via `lp -o raw`
+---
 
-## Requisiti
+## Perché Mojito
 
-- PHP 8.2+ con estensione GD (per immagini ^GF)
-- Composer
-- Node.js 20+
-- CUPS con stampante configurata: `Citizen_CL_S703Z`
+Stampare etichette in produzione è quasi sempre un dolore: software desktop costosi e legati a una singola postazione, template chiusi, driver capricciosi, nessuna API per automatizzare. Mojito ribalta il problema:
 
-### Station GreenEnergyServer
+| Il solito modo | Con Mojito |
+|----------------|-----------|
+| Licenza per PC, software desktop | Gira nel **browser**, una sola installazione sul server |
+| Template proprietari e chiusi | Layout in **JSON versionabile** (git‑friendly) |
+| "Stampa" = PDF → driver → stampante | **ZPL diretto** in RAW: veloce e deterministico |
+| Nessuna automazione | **API REST**: stampi da qualsiasi gestionale/PLC/linea |
+| Anteprima "circa" | Anteprima **fedele al pixel** calibrata sul font reale della stampante |
 
-Come **Foto / ET54 / Sorting**, la build web viene pubblicata su GreenEnergy:
+Il risultato: chiunque in reparto disegna un'etichetta in 2 minuti, la salva sul server, e la linea la stampa via API passando solo i dati variabili.
 
-```bash
-cd Mojito
-npm run deploy:green-energy
+## A chi serve
+
+- **Produzione manifatturiera** — etichette prodotto, lotto, matricola, barcode
+- **Logistica e magazzino** — etichette collo, ubicazione, spedizione
+- **Laboratori e assemblaggio** — targhette tecniche, dati di targa, avvertenze
+- **Chiunque abbia una stampante ZPL** e voglia un designer web + API senza vendor lock‑in
+
+## Funzionalità principali
+
+- 🎨 **Editor drag‑and‑drop** — testo, barcode (Code 128 / Code 39), QR e immagini
+- 🔤 **Anteprima fedele** — font calibrato sul CG Triumvirate della stampante, dimensioni in dots/mm reali
+- 🧩 **Named data sources** — separi il *layout* dai *dati*: lo stesso template stampa infiniti valori
+- 📐 **Formati e DPI** — 203/300 dpi, formati standard o etichetta personalizzata, ridimensionamento automatico
+- 🖱️ **Multi‑selezione, duplica, sposta** — anche elementi sovrapposti (Alt+clic per raggiungere quello sotto)
+- 💾 **3 modi per salvare** — file `.mojito.json`, server, o `localStorage`
+- 🔌 **API REST** — anteprima ZPL e stampa da qualsiasi sistema esterno
+- 🖨️ **Stampa RAW** — CUPS `lp -o raw` su Linux, spooling raw su Windows
+- 🖥️ **Desktop opzionale** — shell Electron con dialog di file nativi
+- ✅ **Qualità industriale** — PHPStan level 9, test unitari front+back, mutation testing
+
+## Come funziona
+
+```
+┌──────────────┐    JSON template     ┌──────────────┐    ZPL (^XA…^XZ)   ┌────────────┐
+│  Designer web │ ───────────────────▶ │  Backend PHP  │ ─────────────────▶ │  Stampante │
+│  (Vue 3)      │   + valori dati      │  ZplBuilder   │   RAW / CUPS       │  ZPL       │
+└──────────────┘                       └──────────────┘                    └────────────┘
 ```
 
-Apri: `http://<server>/stations/apps/mojito/`
+Un **template** (`{labelWidth, labelHeight, dpi, dataSources[], elements[]}`) è l'unica fonte di verità. Gli elementi referenziano un *data source* per nome invece di incorporare un valore fisso: così lo stesso layout stampa dati sempre diversi. Il backend trasforma template + valori in ZPL e lo invia alla stampante.
 
-L’API Mojito è integrata in Laravel (route `/api/health`, `/api/print`, …) — **non serve** `composer serve` sulla porta 8080 quando usi la station.
+- **Frontend**: Vue 3 + Vite (Electron opzionale)
+- **Backend**: PHP 8.2 senza framework, PSR‑4 `Mojito\Label\`
 
-Il deploy copia anche il PHP in `GreenEnergyServer/lib/mojito-label/src/` (autoload self-contained nel repo). Dopo deploy esegui `composer dump-autoload -o` sul server.
-
-Template salvati sul server: `GreenEnergyServer/storage/app/mojito/templates/`.
-
-## Avvio rapido (sviluppo standalone)
+## Avvio rapido
 
 ```bash
-# Backend PHP
-cd server
-composer install
-composer serve
-
-# Frontend (altro terminale, dalla root Mojito)
-npm install
-npm run dev
-```
-
-Apri http://localhost:5174
-
-Oppure tutto insieme:
-
-```bash
+# 1) Dipendenze
 npm install
 cd server && composer install && cd ..
+
+# 2) Dev: frontend + backend PHP insieme (porta 5174)
 npm run dev:all
 ```
 
-## Stampa da terminale (test diretto)
+Apri **http://localhost:5174** e inizia a progettare.
+
+Solo frontend / solo backend:
 
 ```bash
-printf '^XA^FO50,50^ADN,36,20^FDTEST CITIZEN^FS^XZ' | lp -d Citizen_CL_S703Z -o raw
+npm run dev          # frontend (Vite)
+npm run dev:server   # backend (php -S localhost:8080)
+npm run dev:electron # shell desktop Electron
 ```
 
-## Salvataggio layout su file
-
-Hai **3 modi** per salvare un layout:
-
-| Pulsante | Dove finisce |
-|----------|--------------|
-| **Salva su file** | File `.mojito.json` sul disco (dialog Electron, oppure download nel browser) |
-| **Salva server** | `server/storage/templates/{id}.json` |
-| **Salva locale** | Browser `localStorage` (solo per riaprire da UI) |
-
-### Formato file `.mojito.json`
-
-Contiene struttura etichetta + data sources + elementi posizionati, **senza** valori di test:
-
-```json
-{
-  "id": "cavallini-service",
-  "name": "Cavallini Service",
-  "labelWidth": 600,
-  "labelHeight": 400,
-  "dpi": 203,
-  "dataSources": [
-    { "name": "title", "label": "Titolo" },
-    { "name": "barcode", "label": "Barcode" }
-  ],
-  "elements": [ ... ]
-}
-```
-
-### Electron (dialog nativo)
+Test di stampa diretto da terminale:
 
 ```bash
-npm run dev:electron
+printf '^XA^FO50,50^ADN,36,20^FDTEST^FS^XZ' | lp -d Citizen_CL_S703Z -o raw
 ```
 
-Salva/apri da `Documenti/Mojito/layouts/` (cartella suggerita nel dialog).
+### Requisiti
+
+- Node.js 20+
+- PHP 8.2+ con estensione GD (immagini `^GF`)
+- Composer
+- Una stampante ZPL configurata (es. CUPS `Citizen_CL_S703Z`)
 
 ## API
 
 | Metodo | Endpoint | Descrizione |
 |--------|----------|-------------|
 | GET | `/api/health` | Health check |
-| GET | `/api/printers` | Elenco stampanti CUPS |
+| GET | `/api/printers` | Elenco stampanti |
 | GET | `/api/template/default` | Template di esempio |
-| GET | `/api/templates` | Elenco layout salvati sul server |
+| GET | `/api/templates` | Elenco layout salvati |
 | GET | `/api/templates/{id}` | Carica un layout |
 | POST | `/api/templates` | Salva un layout |
 | DELETE | `/api/templates/{id}` | Elimina un layout |
 | POST | `/api/zpl/preview` | Genera ZPL da template + dati |
 | POST | `/api/print` | Stampa etichetta |
 
-### Esempio stampa rapida (JSON)
-
-```json
-{
-  "title": "CAVALLINI SERVICE",
-  "product": "Test",
-  "serial": "ABC123",
-  "barcode": "ABC123456789",
-  "printer": "Citizen_CL_S703Z"
-}
-```
-
-### Esempio con template salvato (via API)
-
-Dopo aver salvato un layout con **Salva server**, puoi stampare passando solo l'id e i valori:
-
-```json
-{
-  "templateId": "cavallini-service",
-  "printer": "Citizen_CL_S703Z",
-  "values": {
-    "title": "CAVALLINI SERVICE",
-    "product": "Prodotto X",
-    "serial": "SN-001",
-    "barcode": "1234567890123"
-  }
-}
-```
+**Stampare un layout salvato passando solo i dati variabili:**
 
 ```bash
 curl -X POST http://localhost:8080/api/print \
   -H 'Content-Type: application/json' \
-  -d '{"templateId":"cavallini-service","values":{"title":"TEST","product":"A","serial":"1","barcode":"999"}}'
+  -d '{"templateId":"mio-template","printer":"Citizen_CL_S703Z",
+       "values":{"title":"PRODOTTO X","serial":"SN-001","barcode":"1234567890123"}}'
 ```
 
-### Esempio con template inline
-
-```json
-{
-  "printer": "Citizen_CL_S703Z",
-  "template": { "...": "..." },
-  "values": {
-    "title": "CAVALLINI SERVICE",
-    "barcode": "ABC123456789"
-  }
-}
-```
-
-## LabelPrinterService (PHP)
+**Uso diretto della libreria PHP:**
 
 ```php
 $service = new \Mojito\Label\LabelPrinterService();
 $service->setPrinterName('Citizen_CL_S703Z');
 $service->printLabel([
-    'title' => 'CAVALLINI SERVICE',
-    'product' => 'Test',
-    'serial' => 'ABC123',
-    'barcode' => 'ABC123456789',
+    'title'   => 'PRODOTTO X',
+    'serial'  => 'SN-001',
+    'barcode' => '1234567890123',
 ]);
 ```
 
-Metodi:
-- `buildZpl(array $data): string`
-- `printZpl(string $zpl): void`
-- `printLabel(array $data): void`
+## Integrazione come "station" (opzionale)
 
-## Test e qualità del codice
-
-Allineato a **GreenEnergyServer** / **GreenEnergy_Client** (PHPStan level 9 al posto di Larastan — Mojito non usa Laravel).
-
-### Backend (`server/`)
-
-| Tool | Comando | Descrizione |
-|------|---------|-------------|
-| PHPUnit | `composer test` | 62 test unitari |
-| PHPStan | `composer analyse` | Analisi statica **level 9** |
-| Pint | `composer pint` | Code style Laravel (check) |
-| Pint fix | `composer pint:fix` | Applica fix automatici |
-| Infection | `composer mutation` | Mutation testing (MSI ≥ 80%) |
-| Tutto | `composer quality` | pint + analyse + test |
-
-Coverage con Xdebug:
+Mojito nasce come app‑station del gestionale **GreenEnergyServer** (Laravel), ma resta un progetto autonomo. Il deploy pubblica la build web e la libreria PHP dentro il server host:
 
 ```bash
-cd server && composer test:coverage
-XDEBUG_MODE=coverage composer mutation
+npm run deploy:green-energy   # build + copia in public/stations/apps/mojito/
+                              # poi sul server: composer dump-autoload -o
 ```
 
-### Frontend
+L'API Mojito viene servita dalle route Laravel (`/api/health`, `/api/print`, …): nessun processo PHP separato in produzione.
 
-| Tool | Comando | Descrizione |
-|------|---------|-------------|
-| Vitest | `npm test` | 35 test su `src/utils/` |
-| Coverage | `npm run test:coverage` | 100% linee su utils |
-| Stryker | `npm run mutation` | Mutation testing (≥ 80%) |
+## Salvataggio layout
 
-### Validazione completa (root)
+| Modo | Dove finisce |
+|------|--------------|
+| **Salva su file** | `.mojito.json` sul disco (dialog Electron o download browser) |
+| **Salva server** | `server/storage/templates/{id}.json` |
+| **Salva locale** | `localStorage` del browser (riapertura rapida da UI) |
 
-```bash
-npm run validate          # test + coverage frontend + pint/phpstan/phpunit server
-npm run validate:full     # validate + Infection + Stryker (opzionale, ~15 min)
-```
+Il file `.mojito.json` contiene struttura + data sources + elementi, **senza** valori di test — versionabile in git.
 
-**Stato attuale:**
+## Qualità del codice
 
-| Check | Risultato |
-|-------|-----------|
-| PHPStan level 9 | ✅ zero errori |
-| Pint | ✅ |
-| PHPUnit (62 test) | ✅ |
-| Vitest (35 test, 100% linee utils) | ✅ |
-| Infection MSI | ~42% (target 80%) |
-| Stryker MSI | ~62% (target 80%) |
+| Check | Comando | Stato |
+|-------|---------|-------|
+| PHPStan **level 9** | `npm run analyse:server` | ✅ zero errori |
+| Pint (code style) | `npm run pint:server:fix` | ✅ |
+| PHPUnit (backend) | `npm run test:server` | ✅ |
+| Vitest (frontend) | `npm test` | ✅ |
+| Validazione completa | `npm run validate` | test + coverage + analisi |
+| + Mutation testing | `npm run validate:full` | Infection + Stryker (~15 min) |
 
-> Mojito non usa Laravel: al posto di **Larastan** usiamo **PHPStan level 9**.
-> I mutation test sono configurati come GreenEnergy ma il target 80% richiede ancora più test.
+Mojito non usa Laravel, quindi al posto di Larastan usa **PHPStan level 9**. La logica di dominio (manipolazione template, geometria canvas, encoding barcode) è isolata in funzioni pure con copertura al 100%, target dei mutation test.
 
 ## Note tecniche
 
-- La stampante Citizen CL-S700 supporta emulazione **ZPL2** (Cross-Emulation)
-- Su Linux/Kali la stampa funziona in modalità **RAW** via CUPS
-- Non vengono generati PDF/HTML — solo ZPL puro
-- I file temporanei ZPL vengono eliminati dopo la stampa
-- Le immagini vengono convertite in formato `^GFA` (ASCII hex)
+- Citizen CL‑S700 supporta emulazione **ZPL II** (Cross‑Emulation)
+- Stampa in modalità **RAW** — nessun PDF/HTML intermedio, solo ZPL
+- Immagini convertite in `^GFA` (ASCII‑hex)
+- File temporanei ZPL rimossi dopo la stampa
+- Anteprima calibrata contro [Labelary](https://labelary.com/zpl.html)
 
 ## Documentazione di riferimento
 
-- [Citizen CL-S700 Series](https://www.citizen-systems.com/en/products/printer/label/cl-s700)
-- [Citizen ZPL Command Reference](https://www.citizen-systems.com/en/support/manuals-and-datasheets/CL-S700)
+- [Citizen CL‑S700 Series](https://www.citizen-systems.com/en/products/printer/label/cl-s700)
 - [ZPL II Programming Guide (Zebra)](https://support.zebra.com/cpws/docs/zpl/zpl_manual.pdf)
-- [Labelary ZPL intro](https://labelary.com/zpl.html)
+- [Labelary — anteprima ZPL online](https://labelary.com/zpl.html)
+
+Per l'architettura interna (moduli, classi backend, flusso dati) vedi [`CLAUDE.md`](CLAUDE.md).
+
+---
+
+<p align="center"><sub>🍹 Mojito Label Designer · POC ZPL per Citizen CL‑S700 / CL‑S703Z</sub></p>
