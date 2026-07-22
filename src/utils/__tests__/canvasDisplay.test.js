@@ -9,6 +9,7 @@ import {
   code39Bars,
   computeBarcodeMetrics,
   computeBarcodeStyle,
+  computeFitScale,
   computeScale,
   computeTextStyle,
   encodeCode128,
@@ -32,6 +33,22 @@ describe('canvasDisplay', () => {
     expect(computeScale(1400)).toBeLessThan(1)
     expect(computeScale(0)).toBe(1)
     expect(computeScale(600, 300)).toBe(0.5)
+  })
+
+  it('computeFitScale adatta l\'etichetta allo spazio disponibile', () => {
+    // limitato dalla larghezza disponibile
+    expect(computeFitScale(600, 400, 300, 10000)).toBe(0.5)
+    // ingrandisce sugli schermi grandi (limite = larghezza)
+    expect(computeFitScale(600, 400, 1200, 10000)).toBe(2)
+    // limitato dall'altezza disponibile
+    expect(computeFitScale(600, 400, 10000, 400)).toBe(1)
+    // cap massimo per evitare ingrandimenti assurdi
+    expect(computeFitScale(100, 100, 100000, 100000)).toBe(3)
+    // senza area nota: fallback al vecchio cap a 700px
+    expect(computeFitScale(1400, 400, 0, 0)).toBe(0.5)
+    expect(computeFitScale(600, 400, 0, 0)).toBe(1)
+    // ignora l'altezza se non nota
+    expect(computeFitScale(600, 400, 900, 0)).toBe(1.5)
   })
 
   it('buildElementDisplayValues gestisce input vuoti', () => {

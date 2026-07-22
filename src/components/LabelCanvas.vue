@@ -1,10 +1,10 @@
 <script setup>
-import { nextTick, ref, computed } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, computed } from 'vue'
 import {
   BARCODE_TEXT_FONT_FAMILY,
   buildElementDisplayValues,
   computeBarcodeMetrics,
-  computeScale,
+  computeFitScale,
   computeTextStyle,
   formatBarcodeValue,
   formatDisplayText,
@@ -32,13 +32,52 @@ const props = defineProps({
 })
 
 const canvasRef = ref(null)
+const wrapperRef = ref(null)
 const groupDrag = ref(null)
 const editingId = ref(null)
 const editValue = ref('')
 const editInputRef = ref(null)
 const marquee = ref(null)
 
-const scale = computed(() => computeScale(template.value.labelWidth))
+// Spazio realmente disponibile per il canvas (misurato): serve ad adattare
+// l'etichetta alla risoluzione/finestra invece di tenerla a dimensione fissa.
+const availWidth = ref(0)
+const availHeight = ref(0)
+let resizeObserver = null
+
+function measureAvailable() {
+  const wrapper = wrapperRef.value
+  if (!wrapper) return
+
+  const area = wrapper.parentElement
+  // margini di sicurezza: padding dell'area + riga meta sopra il canvas.
+  availWidth.value = Math.max(0, (wrapper.clientWidth || 0) - 24)
+  availHeight.value = Math.max(0, (area ? area.clientHeight : 0) - 56)
+}
+
+onMounted(() => {
+  measureAvailable()
+  if (typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(measureAvailable)
+    if (wrapperRef.value) resizeObserver.observe(wrapperRef.value)
+    if (wrapperRef.value?.parentElement) resizeObserver.observe(wrapperRef.value.parentElement)
+  }
+  window.addEventListener('resize', measureAvailable)
+})
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  window.removeEventListener('resize', measureAvailable)
+})
+
+const scale = computed(() =>
+  computeFitScale(
+    template.value.labelWidth,
+    template.value.labelHeight,
+    availWidth.value,
+    availHeight.value
+  )
+)
 
 const canvasStyle = computed(() => ({
   width: `${template.value.labelWidth * scale.value}px`,
@@ -336,7 +375,7 @@ function displayBarcodeValue(element) {
 </script>
 
 <template>
-  <div class="canvas-wrapper">
+  <div ref="wrapperRef" class="canvas-wrapper">
     <div class="canvas-meta">
       {{ template.labelWidth }} × {{ template.labelHeight }} dots @ {{ template.dpi }} DPI ·
       {{ dotsToMm(template.labelWidth, template.dpi) }} × {{ dotsToMm(template.labelHeight, template.dpi) }} mm
