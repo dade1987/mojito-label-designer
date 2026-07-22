@@ -5,6 +5,8 @@ Un editor drag‑and‑drop leggero, self‑hosted e open: niente driver proprie
 
 > Compatibile con qualsiasi stampante termica che parla **ZPL II** (203 / 300 dpi).
 
+📄 Presentazione commerciale (pagina singola, offline): [`docs/presentazione.html`](docs/presentazione.html)
+
 ---
 
 ## Perché Mojito
