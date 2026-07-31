@@ -91,9 +91,24 @@ function zoomReal() {
   zoom.value = 1
 }
 
-const canvasStyle = computed(() => ({
+// Il canvas è disegnato a scala interna fissa (1 px = 1 dot): così i font non
+// scendono mai sotto il "minimum font size" del browser quando si rimpicciolisce
+// (che altrimenti terrebbe le scritte grandi mentre le posizioni si stringono →
+// sovrapposizioni). Lo zoom effettivo è applicato con un transform: scale(),
+// che NON è soggetto a quel minimo e scala tutto in modo uniforme.
+const RENDER_SCALE = 1
+
+// Dimensione visiva riservata nel layout (il transform non occupa spazio).
+const scalerStyle = computed(() => ({
   width: `${template.value.labelWidth * scale.value}px`,
   height: `${template.value.labelHeight * scale.value}px`,
+}))
+
+const canvasStyle = computed(() => ({
+  width: `${template.value.labelWidth * RENDER_SCALE}px`,
+  height: `${template.value.labelHeight * RENDER_SCALE}px`,
+  transform: `scale(${scale.value / RENDER_SCALE})`,
+  transformOrigin: 'top left',
 }))
 
 const elementDisplayValues = computed(() =>
@@ -115,10 +130,10 @@ const marqueeStyle = computed(() => {
   )
 
   return {
-    left: `${rect.x * scale.value}px`,
-    top: `${rect.y * scale.value}px`,
-    width: `${rect.width * scale.value}px`,
-    height: `${rect.height * scale.value}px`,
+    left: `${rect.x * RENDER_SCALE}px`,
+    top: `${rect.y * RENDER_SCALE}px`,
+    width: `${rect.width * RENDER_SCALE}px`,
+    height: `${rect.height * RENDER_SCALE}px`,
   }
 })
 
@@ -324,13 +339,13 @@ function onElementClick(event, id) {
 
 function elementStyle(element) {
   return {
-    left: `${element.x * scale.value}px`,
-    top: `${element.y * scale.value}px`,
+    left: `${element.x * RENDER_SCALE}px`,
+    top: `${element.y * RENDER_SCALE}px`,
   }
 }
 
 function textStyle(element) {
-  return computeTextStyle(element, scale.value)
+  return computeTextStyle(element, RENDER_SCALE)
 }
 
 const barcodeMetricsById = computed(() => {
@@ -356,8 +371,8 @@ function barcodeTextStyle(element) {
   const metrics = barcodeMetrics(element)
 
   return {
-    fontSize: `${metrics.textFontDots * scale.value}px`,
-    marginTop: `${metrics.textGapDots * scale.value}px`,
+    fontSize: `${metrics.textFontDots * RENDER_SCALE}px`,
+    marginTop: `${metrics.textGapDots * RENDER_SCALE}px`,
     fontFamily: BARCODE_TEXT_FONT_FAMILY,
     fontWeight: '400',
     lineHeight: '1',
@@ -366,13 +381,13 @@ function barcodeTextStyle(element) {
 
 function imageStyle(element) {
   return {
-    width: `${(element.width ?? 80) * scale.value}px`,
-    height: `${(element.height ?? 80) * scale.value}px`,
+    width: `${(element.width ?? 80) * RENDER_SCALE}px`,
+    height: `${(element.height ?? 80) * RENDER_SCALE}px`,
   }
 }
 
 function qrStyle(element) {
-  const size = qrPlaceholderSize(element) * scale.value
+  const size = qrPlaceholderSize(element) * RENDER_SCALE
 
   return { width: `${size}px`, height: `${size}px` }
 }
@@ -450,17 +465,18 @@ function displayBarcodeValue(element) {
       </div>
     </div>
 
-    <div
-      ref="canvasRef"
-      class="canvas"
-      :style="canvasStyle"
-      @mousedown.self="startMarquee"
-    >
+    <div class="canvas-scaler" :style="scalerStyle">
       <div
-        v-if="marqueeStyle"
-        class="marquee"
-        :style="marqueeStyle"
-      />
+        ref="canvasRef"
+        class="canvas"
+        :style="canvasStyle"
+        @mousedown.self="startMarquee"
+      >
+        <div
+          v-if="marqueeStyle"
+          class="marquee"
+          :style="marqueeStyle"
+        />
 
       <div
         v-for="element in template.elements"
@@ -497,8 +513,8 @@ function displayBarcodeValue(element) {
           <div class="barcode">
             <svg
               class="bars"
-              :width="barcodeMetrics(element).widthDots * scale"
-              :height="barcodeMetrics(element).barsHeightDots * scale"
+              :width="barcodeMetrics(element).widthDots * RENDER_SCALE"
+              :height="barcodeMetrics(element).barsHeightDots * RENDER_SCALE"
               :viewBox="`0 0 ${barcodeMetrics(element).totalModules} 1`"
               preserveAspectRatio="none"
             >
@@ -533,6 +549,7 @@ function displayBarcodeValue(element) {
           />
           <div v-else class="image-placeholder" :style="imageStyle(element)">IMG</div>
         </template>
+      </div>
       </div>
     </div>
   </div>
@@ -703,6 +720,14 @@ function displayBarcodeValue(element) {
 }
 
 .cal-actions .cal-save:hover { background: #0c8a4c; }
+
+/* Riserva nel layout la dimensione visiva; il .canvas interno è disegnato a
+   scala fissa e ridimensionato con transform: scale() (immune al minimum
+   font-size del browser). */
+.canvas-scaler {
+  position: relative;
+  flex: none;
+}
 
 .canvas {
   position: relative;
