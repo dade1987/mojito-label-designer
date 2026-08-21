@@ -35,6 +35,13 @@ final class PrinterResolutionTest extends TestCase
         self::assertSame(203, PrinterResolution::forPrinter('Citizen_CL_S700'));
     }
 
+    public function test_it_knows_the_apex_of_the_workshop(): void
+    {
+        // La Apex installata in reparto stampa a 600 dpi.
+        self::assertSame(600, PrinterResolution::forPrinter('Apex_600'));
+        self::assertSame(600, PrinterResolution::forPrinter('APEX label printer'));
+    }
+
     public function test_an_unknown_printer_admits_it(): void
     {
         // Meglio nessun valore che uno inventato: chi disegna lo imposta a mano.

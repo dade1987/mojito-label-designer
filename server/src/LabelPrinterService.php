@@ -67,11 +67,10 @@ final class LabelPrinterService
         // sbagliata, e il designer non ha modo di accorgersene da solo.
         $resolutions = [];
         foreach ($printers as $printer) {
-            $name = is_scalar($printer) ? (string) $printer : '';
-            $dpi = $name === '' ? null : PrinterResolution::forPrinter($name);
+            $dpi = PrinterResolution::forPrinter($printer);
 
             if ($dpi !== null) {
-                $resolutions[$name] = $dpi;
+                $resolutions[$printer] = $dpi;
             }
         }
 

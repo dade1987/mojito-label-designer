@@ -22,9 +22,18 @@ export const LABEL_FORMATS = [
 ]
 
 /** CL-S700 stampa a 203 dpi, CL-S703 a 300 dpi. */
+/**
+ * Le risoluzioni delle stampanti di etichette.
+ *
+ * Erano due sole, con l'etichetta che nominava i modelli Citizen: con un
+ * secondo produttore in reparto quei nomi confondono, e una risoluzione
+ * fuori elenco non era nemmeno selezionabile. Sono i tre valori standard del
+ * settore; se una stampante ne dichiara un altro, viene aggiunto all'elenco.
+ */
 export const PRINTER_RESOLUTIONS = [
-  { dpi: 203, label: '203 dpi (CL-S700)' },
-  { dpi: 300, label: '300 dpi (CL-S703)' },
+  { dpi: 203, label: '203 dpi (8 punti/mm)' },
+  { dpi: 300, label: '300 dpi (12 punti/mm)' },
+  { dpi: 600, label: '600 dpi (24 punti/mm)' },
 ]
 
 export const CUSTOM_FORMAT_ID = 'custom'

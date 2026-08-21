@@ -47,6 +47,14 @@ final class TypeCaster
             return $value;
         }
 
+        // Un decimale e' un numero, non un valore illeggibile: troncarlo e'
+        // cio' che fa la stampante. Scartarlo e mettere il default faceva
+        // stampare un codice a barre di dimensione 2 a chi ne aveva scritto
+        // 2,5, senza dire niente a nessuno.
+        if (is_float($value) && is_finite($value)) {
+            return (int) $value;
+        }
+
         if (is_string($value) && is_numeric($value)) {
             return (int) $value;
         }

@@ -142,14 +142,29 @@ function applyPrinterResolution() {
   showStatus(`Disegno riportato a ${printerDpi.value} dpi, come la stampante`, 'success')
 }
 
-const dpiOptions = computed(() => {
-  const current = selectedDpi.value
+/**
+ * L'elenco delle risoluzioni, con quella dichiarata dalla stampante scelta
+ * aggiunta se non e' fra le standard: una stampante che stampa a una
+ * risoluzione fuori elenco non deve restare non selezionabile.
+ */
+function withPrinterResolution() {
+  const dpi = printerDpi.value
 
-  if (PRINTER_RESOLUTIONS.some((resolution) => resolution.dpi === current)) {
+  if (!dpi || PRINTER_RESOLUTIONS.some((resolution) => resolution.dpi === dpi)) {
     return PRINTER_RESOLUTIONS
   }
 
-  return [{ dpi: current, label: `${current} dpi` }, ...PRINTER_RESOLUTIONS]
+  return [...PRINTER_RESOLUTIONS, { dpi, label: `${dpi} dpi (${selectedPrinter.value})` }]
+}
+
+const dpiOptions = computed(() => {
+  const current = selectedDpi.value
+
+  if (withPrinterResolution().some((resolution) => resolution.dpi === current)) {
+    return withPrinterResolution()
+  }
+
+  return [{ dpi: current, label: `${current} dpi` }, ...withPrinterResolution()]
 })
 
 const labelWidthMm = computed({
@@ -1260,7 +1275,14 @@ function buildApiExample() {
             </label>
             <label>
               Module width
-              <input v-model.number="selectedElement.moduleWidth" type="number" min="1" max="10" />
+              <input
+                :value="selectedElement.moduleWidth"
+                type="number"
+                min="1"
+                max="10"
+                step="1"
+                @input="selectedElement.moduleWidth = printableMagnification($event.target.value)"
+              />
             </label>
           </template>
 

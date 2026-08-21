@@ -192,7 +192,10 @@ describe('labelFormats', () => {
     expect(template.elements).toBeUndefined()
   })
 
-  it('PRINTER_RESOLUTIONS copre CL-S700 e CL-S703', () => {
-    expect(PRINTER_RESOLUTIONS.map((resolution) => resolution.dpi)).toEqual([203, 300])
+  it('PRINTER_RESOLUTIONS copre le tre risoluzioni standard di settore', () => {
+    // Erano due, con l'etichetta che nominava i modelli Citizen: con un
+    // secondo produttore in reparto una risoluzione fuori elenco non era
+    // nemmeno selezionabile.
+    expect(PRINTER_RESOLUTIONS.map((resolution) => resolution.dpi)).toEqual([203, 300, 600])
   })
 })

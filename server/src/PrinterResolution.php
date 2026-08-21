@@ -30,6 +30,8 @@ final class PrinterResolution
         // risoluzione: 700 e' 203 dpi, 703 e' 300 dpi.
         'clS703' => 300,
         'clS700' => 203,
+        // Apex: le stampanti installate in reparto sono a 600 dpi.
+        'apex' => 600,
     ];
 
     public static function forPrinter(string $printer): ?int

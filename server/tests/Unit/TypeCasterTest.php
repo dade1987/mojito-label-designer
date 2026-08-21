@@ -48,4 +48,26 @@ final class TypeCasterTest extends TestCase
         $this->assertTrue(TypeCaster::bool('yes', true));
         $this->assertFalse(TypeCaster::bool('yes', false));
     }
+
+    public function test_a_decimal_is_truncated_instead_of_being_thrown_away(): void
+    {
+        // Un decimale arrivato dal JSON e' un numero, non un valore illeggibile:
+        // scartarlo e sostituirlo col default faceva stampare un codice a barre
+        // di dimensione 2 a chi ne aveva scritto 2,5, senza dire niente.
+        self::assertSame(2, TypeCaster::int(2.5, 9));
+        self::assertSame(3, TypeCaster::int(3.9, 9));
+        self::assertSame(-2, TypeCaster::int(-2.5, 9));
+    }
+
+    public function test_a_decimal_string_is_truncated_too(): void
+    {
+        self::assertSame(2, TypeCaster::int('2.5', 9));
+    }
+
+    public function test_what_is_not_a_number_still_falls_back(): void
+    {
+        self::assertSame(9, TypeCaster::int('due e mezzo', 9));
+        self::assertSame(9, TypeCaster::int(null, 9));
+        self::assertSame(9, TypeCaster::int(NAN, 9));
+    }
 }
