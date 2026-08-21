@@ -1,3 +1,5 @@
+import { authHeaders } from './authStorage.js'
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 
 function resolveBaseUrl() {
@@ -16,6 +18,7 @@ async function request(path, options = {}) {
   const response = await fetch(`${resolveBaseUrl()}${path}`, {
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders(),
       ...(options.headers ?? {}),
     },
     ...options,
@@ -24,10 +27,24 @@ async function request(path, options = {}) {
   const payload = await response.json().catch(() => ({}))
 
   if (!response.ok) {
-    throw new Error(payload.error ?? `Errore HTTP ${response.status}`)
+    const error = new Error(payload.error ?? `Errore HTTP ${response.status}`)
+    error.status = response.status
+    throw error
   }
 
   return payload
+}
+
+/** Se l'installazione richiede la password e se quella memorizzata vale. */
+export function fetchAuthStatus() {
+  return request('/api/auth')
+}
+
+export function checkPassword(password) {
+  return request('/api/auth/check', {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  })
 }
 
 export function fetchPrinters() {

@@ -140,4 +140,47 @@ final class ApiHandlerTest extends TestCase
         $result = $handler->handle('GET', '/api/printers');
         $this->assertSame([], $result['payload']['printers']);
     }
+
+    public function test_without_password_everything_stays_open(): void
+    {
+        $auth = $this->handler->handle('GET', '/api/auth');
+
+        $this->assertSame(200, $auth['status']);
+        $this->assertFalse($auth['payload']['passwordRequired']);
+        $this->assertTrue($auth['payload']['authenticated']);
+
+        $this->assertSame(200, $this->handler->handle('GET', '/api/templates')['status']);
+    }
+
+    public function test_with_password_the_api_is_locked_until_authenticated(): void
+    {
+        putenv('MOJITO_PASSWORD=segreta');
+
+        try {
+            $auth = $this->handler->handle('GET', '/api/auth');
+            $this->assertTrue($auth['payload']['passwordRequired']);
+            $this->assertFalse($auth['payload']['authenticated']);
+
+            // Senza password: chiuso (salvo la salute, che serve al monitoraggio).
+            $this->assertSame(401, $this->handler->handle('GET', '/api/templates')['status']);
+            $this->assertSame(401, $this->handler->handle('POST', '/api/print', '{}')['status']);
+            $this->assertSame(200, $this->handler->handle('GET', '/api/health')['status']);
+
+            // Verifica password: sbagliata 401, giusta ok.
+            $this->assertSame(401, $this->handler->handle('POST', '/api/auth/check', '{"password":"no"}')['status']);
+            $this->assertSame(200, $this->handler->handle('POST', '/api/auth/check', '{"password":"segreta"}')['status']);
+
+            // Con l'intestazione giusta si lavora (nome case-insensitive).
+            $ok = $this->handler->handle('GET', '/api/templates', '', ['X-Mojito-Auth' => 'segreta']);
+            $this->assertSame(200, $ok['status']);
+
+            $wrong = $this->handler->handle('GET', '/api/templates', '', ['x-mojito-auth' => 'no']);
+            $this->assertSame(401, $wrong['status']);
+
+            $authed = $this->handler->handle('GET', '/api/auth', '', ['x-mojito-auth' => 'segreta']);
+            $this->assertTrue($authed['payload']['authenticated']);
+        } finally {
+            putenv('MOJITO_PASSWORD');
+        }
+    }
 }

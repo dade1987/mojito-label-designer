@@ -15,11 +15,41 @@ final class ApiHandler
     ) {}
 
     /**
+     * @param  array<string, string>  $headers  Intestazioni della richiesta (chiavi case-insensitive).
      * @return array{status: int, payload: array<string, mixed>}
      */
-    public function handle(string $method, string $path, string $rawBody = ''): array
+    public function handle(string $method, string $path, string $rawBody = '', array $headers = []): array
     {
         try {
+            // Sul server di produzione il designer non deve essere aperto a
+            // chiunque passi davanti alla postazione: con MOJITO_PASSWORD
+            // impostata, tutte le API (salvo salute e login) chiedono la
+            // password. Senza la variabile — sviluppo, uso locale — nulla
+            // cambia.
+            $password = self::requiredPassword();
+
+            if ($method === 'GET' && $path === '/api/auth') {
+                return $this->ok([
+                    'passwordRequired' => $password !== '',
+                    'authenticated' => $password === '' || $this->isAuthenticated($headers, $password),
+                ]);
+            }
+
+            if ($method === 'POST' && $path === '/api/auth/check') {
+                $body = $this->decodeBody($rawBody);
+                $given = TypeCaster::string($body['password'] ?? '');
+
+                if ($password !== '' && ! hash_equals($password, $given)) {
+                    return $this->error(401, 'Password errata.');
+                }
+
+                return $this->ok(['status' => 'ok']);
+            }
+
+            if ($password !== '' && $path !== '/api/health' && ! $this->isAuthenticated($headers, $password)) {
+                return $this->error(401, 'Password richiesta.');
+            }
+
             return match (true) {
                 $method === 'GET' && $path === '/api/health' => $this->ok(['status' => 'ok']),
                 $method === 'GET' && $path === '/api/printers' => $this->ok($this->service->listPrintersInfo()),
@@ -35,6 +65,37 @@ final class ApiHandler
         } catch (Throwable $exception) {
             return $this->error(500, $exception->getMessage());
         }
+    }
+
+    /**
+     * La password richiesta dall'installazione, se c'e'.
+     *
+     * Si legge da piu' fonti perche' i loader .env non popolano tutti
+     * getenv(): Laravel (phpdotenv) riempie $_ENV/$_SERVER.
+     */
+    public static function requiredPassword(): string
+    {
+        foreach ([getenv('MOJITO_PASSWORD'), $_ENV['MOJITO_PASSWORD'] ?? null, $_SERVER['MOJITO_PASSWORD'] ?? null] as $candidate) {
+            if (is_string($candidate) && trim($candidate) !== '') {
+                return trim($candidate);
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     */
+    private function isAuthenticated(array $headers, string $password): bool
+    {
+        foreach ($headers as $name => $value) {
+            if (strtolower($name) === 'x-mojito-auth') {
+                return hash_equals($password, trim($value));
+            }
+        }
+
+        return false;
     }
 
     /**
