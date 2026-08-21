@@ -1,3 +1,4 @@
+import { printableMagnification } from './aspectRatio.js'
 import {
   TEXT_ADVANCE_RATIO,
   computeBarcodeStyle,
@@ -9,7 +10,9 @@ export function estimateTextWidth(text, fontHeight = 30, fontWidth = fontHeight)
 }
 
 export function qrPlaceholderSize(element) {
-  const magnification = Math.max(1, Math.min(10, element.magnification ?? 4))
+  // La stampante tronca ai punti interi: il disegno deve usare lo stesso
+  // numero, o promette una dimensione che la carta non dara'.
+  const magnification = printableMagnification(element.magnification)
 
   return magnification * 25
 }

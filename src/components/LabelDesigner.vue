@@ -29,6 +29,7 @@ import {
 import { cloneTemplateState } from '../utils/cloneSerializable.js'
 import { hasWork, startNewLayout } from '../utils/newLayout.js'
 import { resolutionForPrinter, shouldWarnResolution } from '../utils/printerResolution.js'
+import { printableMagnification, resizeKeepingRatio } from '../utils/aspectRatio.js'
 import {
   deleteLocalLayout,
   importLayoutFromFile,
@@ -65,6 +66,9 @@ const printers = ref([])
 const selectedPrinter = ref('')
 // Risoluzione dichiarata dal server per ogni stampante conosciuta.
 const printerResolutions = ref({})
+// Le immagini si ridimensionano a proporzioni bloccate: un logo schiacciato
+// non si nota sullo schermo e si vede benissimo stampato.
+const keepImageRatio = ref(true)
 const printerPlatform = ref('')
 const zplPreview = ref('')
 const statusMessage = ref('')
@@ -824,6 +828,27 @@ async function handleImportLayout(event) {
  * Ricomincia da un foglio pulito, conservando formato e risoluzione: chi
  * disegna etichette lavora quasi sempre sulla stessa misura.
  */
+/**
+ * Larghezza o altezza di un'immagine, con le proporzioni bloccate se
+ * richiesto.
+ */
+function setImageSize(dimension, value) {
+  const element = selectedElement.value
+  if (!element) return
+
+  const requested = Number(value)
+  if (!Number.isFinite(requested)) return
+
+  if (!keepImageRatio.value) {
+    element[dimension] = Math.max(10, Math.round(requested))
+    return
+  }
+
+  const resized = resizeKeepingRatio(element, { [dimension]: requested })
+  element.width = resized.width
+  element.height = resized.height
+}
+
 function handleNewLayout() {
   if (hasWork(template.value)) {
     const confirmed = window.confirm(
@@ -958,7 +983,7 @@ function buildApiExample() {
         </label>
 
         <button type="button" class="btn secondary" :disabled="isBusy || !selectedPrinter.trim()" @click="handleQuickPrint">
-          Stampa rapida
+          Test stampante
         </button>
         <button type="button" class="btn primary" :disabled="isBusy || !selectedPrinter.trim()" @click="handlePrint">
           Stampa etichetta
@@ -1271,18 +1296,39 @@ function buildApiExample() {
             </label>
             <label>
               Magnification
-              <input v-model.number="selectedElement.magnification" type="number" min="1" max="10" />
+              <input
+                :value="selectedElement.magnification"
+                type="number"
+                min="1"
+                max="10"
+                step="1"
+                @input="selectedElement.magnification = printableMagnification($event.target.value)"
+              />
             </label>
           </template>
 
           <template v-if="selectedElement.type === 'image'">
+            <label class="inline-check">
+              <input v-model="keepImageRatio" type="checkbox" />
+              Mantieni le proporzioni
+            </label>
             <label>
               Larghezza
-              <input v-model.number="selectedElement.width" type="number" min="10" />
+              <input
+                :value="selectedElement.width"
+                type="number"
+                min="10"
+                @input="setImageSize('width', $event.target.value)"
+              />
             </label>
             <label>
               Altezza
-              <input v-model.number="selectedElement.height" type="number" min="10" />
+              <input
+                :value="selectedElement.height"
+                type="number"
+                min="10"
+                @input="setImageSize('height', $event.target.value)"
+              />
             </label>
             <label>
               Immagine
