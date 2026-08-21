@@ -8,6 +8,7 @@ import {
   previewZpl,
   printLabel,
   saveTemplate,
+  deleteTemplate,
 } from '../utils/api.js'
 import {
   buildValuesFromSources,
@@ -26,6 +27,7 @@ import {
   updateElementTextValue,
 } from '../utils/templateStore.js'
 import { cloneTemplateState } from '../utils/cloneSerializable.js'
+import { hasWork, startNewLayout } from '../utils/newLayout.js'
 import {
   deleteLocalLayout,
   importLayoutFromFile,
@@ -799,6 +801,51 @@ async function handleImportLayout(event) {
   }
 }
 
+/**
+ * Ricomincia da un foglio pulito, conservando formato e risoluzione: chi
+ * disegna etichette lavora quasi sempre sulla stessa misura.
+ */
+function handleNewLayout() {
+  if (hasWork(template.value)) {
+    const confirmed = window.confirm(
+      'Iniziare un layout nuovo? Quello attuale verrà chiuso: salvalo prima se ti serve.'
+    )
+    if (!confirmed) return
+  }
+
+  template.value = startNewLayout(template.value)
+  selectedLayoutId.value = ''
+  selectedElementIds.value = []
+  showStatus('Nuovo layout pronto', 'info')
+}
+
+/**
+ * Elimina il layout dal server, non solo la copia nel browser: erano due
+ * cose diverse e ce n'era una sola.
+ */
+async function handleDeleteServerLayout() {
+  const option = layoutOptions.value.find((item) => item.id === selectedLayoutId.value)
+  if (!option || option.source === 'local') return
+
+  const confirmed = window.confirm(
+    `Eliminare "${option.label}" dal server? Lo perderanno anche le altre postazioni.`
+  )
+  if (!confirmed) return
+
+  try {
+    isBusy.value = true
+    await deleteTemplate(option.layoutId)
+    selectedLayoutId.value = ''
+    const { templates } = await fetchTemplates()
+    serverLayouts.value = templates
+    showStatus('Layout eliminato dal server', 'info')
+  } catch (error) {
+    showStatus(`Eliminazione fallita: ${error?.message ?? error}`, 'error')
+  } finally {
+    isBusy.value = false
+  }
+}
+
 function handleDeleteLocalLayout() {
   if (!template.value?.id) return
 
@@ -945,6 +992,7 @@ function buildApiExample() {
         </label>
 
         <div class="layout-actions">
+          <button type="button" class="btn primary" @click="handleNewLayout">+ Nuovo layout</button>
           <button type="button" class="btn ghost" @click="handleSaveLocal">Salva locale</button>
           <button type="button" class="btn ghost" :disabled="isBusy" @click="handleSaveServer">
             Salva server
@@ -972,6 +1020,14 @@ function buildApiExample() {
         </button>
         <button type="button" class="btn ghost danger-text" @click="handleDeleteLocalLayout">
           Elimina copia locale
+        </button>
+        <button
+          type="button"
+          class="btn ghost danger-text"
+          :disabled="isBusy || !selectedLayoutId"
+          @click="handleDeleteServerLayout"
+        >
+          Elimina dal server
         </button>
 
         <h2>Elementi</h2>
