@@ -43,4 +43,22 @@ final class ElementRotationTest extends TestCase
         self::assertSame('R', ElementRotation::forElement(['rotation' => 90]));
         self::assertSame('N', ElementRotation::forElement([]));
     }
+
+    public function test_degrees_returns_only_printable_angles(): void
+    {
+        self::assertSame(0, ElementRotation::degrees(0));
+        self::assertSame(90, ElementRotation::degrees(90));
+        self::assertSame(180, ElementRotation::degrees(180));
+        self::assertSame(270, ElementRotation::degrees(270));
+        self::assertSame(90, ElementRotation::degrees(450));
+        self::assertSame(0, ElementRotation::degrees(45));
+        self::assertSame(0, ElementRotation::degrees(-90));
+        self::assertSame(0, ElementRotation::degrees('x'));
+    }
+
+    public function test_degrees_for_element_reads_rotation(): void
+    {
+        self::assertSame(270, ElementRotation::degreesForElement(['rotation' => 270]));
+        self::assertSame(0, ElementRotation::degreesForElement([]));
+    }
 }

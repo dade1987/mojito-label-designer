@@ -103,6 +103,117 @@ final class ZplImageConverterTest extends TestCase
         $this->assertNull($result);
     }
 
+    public function test_palette_png_reads_real_colors_not_indexes(): void
+    {
+        if (! function_exists('imagecreate')) {
+            $this->markTestSkipped('GD extension required.');
+        }
+
+        // PNG a palette tutto bianco: indice 0 = bianco. Letto come indice
+        // (0 = nero) stamperebbe un blocco pieno; letto come colore resta
+        // vuoto com'e' davvero.
+        $image = imagecreate(8, 2);
+        $this->assertNotFalse($image);
+        imagecolorallocate($image, 255, 255, 255);
+
+        ob_start();
+        imagepng($image);
+        $png = ob_get_clean();
+        imagedestroy($image);
+
+        $converter = new ZplImageConverter;
+        $graphic = $converter->fromBinary($png ?: '');
+
+        $this->assertIsArray($graphic);
+        $this->assertSame('0000', $graphic['hexData']);
+    }
+
+    public function test_resize_keeps_aspect_ratio_like_preview(): void
+    {
+        if (! function_exists('imagecreatetruecolor')) {
+            $this->markTestSkipped('GD extension required.');
+        }
+
+        // Immagine 16x8 tutta nera dentro un riquadro 16x16: come l'anteprima
+        // (object-fit: contain) deve restare 16x8 centrata, non stirarsi.
+        // Le righe sopra e sotto restano quindi vuote.
+        $image = imagecreatetruecolor(16, 8);
+        $this->assertNotFalse($image);
+        $black = imagecolorallocate($image, 0, 0, 0);
+        imagefilledrectangle($image, 0, 0, 15, 7, (int) $black);
+
+        ob_start();
+        imagepng($image);
+        $png = ob_get_clean();
+        imagedestroy($image);
+
+        $converter = new ZplImageConverter;
+        $graphic = $converter->fromBinary($png ?: '', 16, 16);
+
+        $this->assertIsArray($graphic);
+        $this->assertSame(2, $graphic['bytesPerRow']);
+        $this->assertSame(32, $graphic['totalBytes']);
+
+        $rows = str_split($graphic['hexData'], 4);
+        $this->assertSame('0000', $rows[0]);
+        $this->assertSame('FFFF', $rows[7]);
+        $this->assertSame('FFFF', $rows[8]);
+        $this->assertSame('0000', $rows[15]);
+    }
+
+    public function test_rotation_swaps_dimensions(): void
+    {
+        if (! function_exists('imagecreatetruecolor')) {
+            $this->markTestSkipped('GD extension required.');
+        }
+
+        // 16x8 ruotata di 90 gradi diventa 8x16: una riga passa da 2 byte a 1.
+        $image = imagecreatetruecolor(16, 8);
+        $this->assertNotFalse($image);
+        $black = imagecolorallocate($image, 0, 0, 0);
+        imagefilledrectangle($image, 0, 0, 15, 7, (int) $black);
+
+        ob_start();
+        imagepng($image);
+        $png = ob_get_clean();
+        imagedestroy($image);
+
+        $converter = new ZplImageConverter;
+        $graphic = $converter->fromBinary($png ?: '', 0, 0, 128, 90);
+
+        $this->assertIsArray($graphic);
+        $this->assertSame(1, $graphic['bytesPerRow']);
+        $this->assertSame(16, $graphic['totalBytes']);
+        $this->assertSame(str_repeat('FF', 16), $graphic['hexData']);
+    }
+
+    public function test_rotation_180_keeps_dimensions(): void
+    {
+        if (! function_exists('imagecreatetruecolor')) {
+            $this->markTestSkipped('GD extension required.');
+        }
+
+        // 8x2: riga nera sopra, riga bianca sotto. Capovolta, il nero finisce sotto.
+        $image = imagecreatetruecolor(8, 2);
+        $this->assertNotFalse($image);
+        $white = imagecolorallocate($image, 255, 255, 255);
+        imagefilledrectangle($image, 0, 0, 7, 1, (int) $white);
+        $black = imagecolorallocate($image, 0, 0, 0);
+        imagefilledrectangle($image, 0, 0, 7, 0, (int) $black);
+
+        ob_start();
+        imagepng($image);
+        $png = ob_get_clean();
+        imagedestroy($image);
+
+        $converter = new ZplImageConverter;
+        $graphic = $converter->fromBinary($png ?: '', 0, 0, 128, 180);
+
+        $this->assertIsArray($graphic);
+        $this->assertSame(1, $graphic['bytesPerRow']);
+        $this->assertSame('00FF', $graphic['hexData']);
+    }
+
     public function test_from_binary_pads_short_hex_data(): void
     {
         if (! function_exists('imagecreatetruecolor')) {

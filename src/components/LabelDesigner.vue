@@ -127,6 +127,17 @@ const selectedDpi = computed({
   },
 })
 
+// I layout salvati prima di questo campo non lo hanno: per loro vale "gap",
+// lo stesso default che applica il server quando il campo manca.
+const mediaTracking = computed({
+  get: () => template.value?.mediaTracking ?? 'gap',
+  set: (value) => {
+    if (template.value) {
+      template.value.mediaTracking = value
+    }
+  },
+})
+
 const printerDpi = computed(() => resolutionForPrinter(printerResolutions.value, selectedPrinter.value))
 
 // Il disegno a una risoluzione diversa da quella di stampa esce di misura
@@ -1198,7 +1209,7 @@ function buildApiExample() {
             <input v-model.number="selectedElement.y" type="number" min="0" />
           </label>
 
-          <label v-if="['text', 'barcode', 'qr'].includes(selectedElement.type)">
+          <label v-if="['text', 'barcode', 'qr', 'image'].includes(selectedElement.type)">
             Rotazione
             <select v-model.number="selectedElement.rotation">
               <option :value="0">Nessuna</option>
@@ -1207,7 +1218,8 @@ function buildApiExample() {
               <option :value="270">270°</option>
             </select>
             <small class="hint">
-              La stampante conosce solo questi quattro orientamenti. Le immagini non si ruotano.
+              La stampante conosce solo questi quattro orientamenti. L'angolo in alto a
+              sinistra resta fermo, come sulla carta.
             </small>
           </label>
 
@@ -1418,6 +1430,19 @@ function buildApiExample() {
             </option>
             <option :value="CUSTOM_FORMAT_ID">Personalizzato</option>
           </select>
+        </label>
+        <label>
+          Avanzamento carta
+          <select v-model="mediaTracking">
+            <option value="gap">Etichette con spazio (gap)</option>
+            <option value="mark">Tacca nera sul retro</option>
+            <option value="continuous">Carta continua</option>
+            <option value="none">Non impostare (usa la stampante)</option>
+          </select>
+          <small class="hint">
+            Con "gap" la stampante si riallinea all'inizio di ogni etichetta: è il
+            rimedio quando la stampa scivola un po' più in là ad ogni copia.
+          </small>
         </label>
         <label>
           Intensità di stampa

@@ -24,13 +24,29 @@ final class ElementRotation
 
     public static function toZpl(mixed $degrees): string
     {
-        if (!is_numeric($degrees)) {
-            return 'N';
+        return self::ORIENTATIONS[self::degrees($degrees)] ?? 'N';
+    }
+
+    /**
+     * L'angolo che verra' stampato davvero: 0, 90, 180 o 270.
+     */
+    public static function degrees(mixed $degrees): int
+    {
+        if (! is_numeric($degrees)) {
+            return 0;
         }
 
         $angle = ((int) $degrees) % 360;
 
-        return self::ORIENTATIONS[$angle] ?? 'N';
+        return array_key_exists($angle, self::ORIENTATIONS) ? $angle : 0;
+    }
+
+    /**
+     * @param  array<string, mixed>  $element
+     */
+    public static function degreesForElement(array $element): int
+    {
+        return self::degrees($element['rotation'] ?? 0);
     }
 
     /**

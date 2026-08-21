@@ -30,8 +30,10 @@ final class PrinterResolution
         // risoluzione: 700 e' 203 dpi, 703 e' 300 dpi.
         'clS703' => 300,
         'clS700' => 203,
-        // Apex: le stampanti installate in reparto sono a 600 dpi.
+        // Apex/Apix: le stampanti installate in reparto sono a 600 dpi
+        // (a Windows risultano come "Apix 251 (600DPI)").
         'apex' => 600,
+        'apix' => 600,
     ];
 
     public static function forPrinter(string $printer): ?int
@@ -67,7 +69,7 @@ final class PrinterResolution
     {
         $raw = getenv('MOJITO_PRINTER_DPI');
 
-        if (!is_string($raw) || trim($raw) === '') {
+        if (! is_string($raw) || trim($raw) === '') {
             return [];
         }
 

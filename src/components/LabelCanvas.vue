@@ -25,6 +25,7 @@ import {
 } from '../utils/canvasSelection.js'
 import { dotsToMm } from '../utils/labelFormats.js'
 import { resolveElementValue } from '../utils/templateStore.js'
+import { zplRotationTransform } from '../utils/zplRotation.js'
 
 const template = defineModel('template', { required: true })
 const selectedIds = defineModel('selectedIds', { default: () => [] })
@@ -386,11 +387,13 @@ function elementStyle(element) {
   }
 
   // Se la stampante lo ruotera', il disegno deve ruotare: mostrarlo dritto
-  // sarebbe l'ennesima promessa che la carta non mantiene. L'origine e'
-  // l'angolo in alto a sinistra, come in ZPL, dove il punto ^FO resta fermo.
-  const rotation = Number(element.rotation)
-  if (Number.isFinite(rotation) && rotation % 360 !== 0) {
-    style.transform = `rotate(${rotation % 360}deg)`
+  // sarebbe l'ennesima promessa che la carta non mantiene. La trasformazione
+  // replica l'ancoraggio ZPL (angolo in alto a sinistra fermo su ^FO, vedi
+  // zplRotation.js), e gli angoli non stampabili restano dritti come fa il
+  // server.
+  const transform = zplRotationTransform(element.rotation)
+  if (transform !== '') {
+    style.transform = transform
     style.transformOrigin = 'top left'
   }
 

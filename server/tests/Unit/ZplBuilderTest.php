@@ -62,6 +62,24 @@ final class ZplBuilderTest extends TestCase
         $this->assertStringContainsString('^GFA', $zpl);
     }
 
+    public function test_render_template_tracks_label_gap_by_default(): void
+    {
+        $zpl = $this->builder->renderTemplate(['elements' => []]);
+
+        $this->assertStringContainsString("^MNY\n", $zpl);
+    }
+
+    public function test_render_template_media_tracking_variants(): void
+    {
+        $continuous = $this->builder->renderTemplate(['mediaTracking' => 'continuous', 'elements' => []]);
+        $mark = $this->builder->renderTemplate(['mediaTracking' => 'mark', 'elements' => []]);
+        $none = $this->builder->renderTemplate(['mediaTracking' => 'none', 'elements' => []]);
+
+        $this->assertStringContainsString('^MNN', $continuous);
+        $this->assertStringContainsString('^MNM', $mark);
+        $this->assertStringNotContainsString('^MN', $none);
+    }
+
     public function test_render_template_throws_on_invalid_elements(): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -247,7 +265,7 @@ final class ZplBuilderTest extends TestCase
     {
         // La riga leggibile usa il font attivo al momento: senza impostarlo
         // esce con quello predefinito della stampante, minuscolo.
-        $zpl = (new ZplBuilder())->renderTemplate([
+        $zpl = (new ZplBuilder)->renderTemplate([
             'labelWidth' => 400,
             'labelHeight' => 300,
             'elements' => [[
@@ -266,7 +284,7 @@ final class ZplBuilderTest extends TestCase
     {
         // Non si cambia l'aspetto delle etichette gia' in uso: il font si
         // imposta solo se qualcuno lo ha chiesto.
-        $zpl = (new ZplBuilder())->renderTemplate([
+        $zpl = (new ZplBuilder)->renderTemplate([
             'labelWidth' => 400,
             'labelHeight' => 300,
             'elements' => [[
@@ -282,7 +300,7 @@ final class ZplBuilderTest extends TestCase
 
     public function test_the_readable_line_size_is_an_integer_like_everything_in_zpl(): void
     {
-        $zpl = (new ZplBuilder())->renderTemplate([
+        $zpl = (new ZplBuilder)->renderTemplate([
             'labelWidth' => 400,
             'labelHeight' => 300,
             'elements' => [[
@@ -303,7 +321,7 @@ final class ZplBuilderTest extends TestCase
         // stampante, spesso bassa: e' il motivo per cui le etichette escono
         // sbiadite mentre da BarTender, che la imposta dal driver, escono
         // nere.
-        $zpl = (new ZplBuilder())->renderTemplate([
+        $zpl = (new ZplBuilder)->renderTemplate([
             'labelWidth' => 400,
             'labelHeight' => 300,
             'darkness' => 20,
@@ -315,7 +333,7 @@ final class ZplBuilderTest extends TestCase
 
     public function test_the_print_speed_can_be_set_because_fast_prints_lighter(): void
     {
-        $zpl = (new ZplBuilder())->renderTemplate([
+        $zpl = (new ZplBuilder)->renderTemplate([
             'labelWidth' => 400,
             'labelHeight' => 300,
             'printSpeed' => 2,
@@ -328,7 +346,7 @@ final class ZplBuilderTest extends TestCase
     public function test_without_settings_nothing_is_imposed_on_the_printer(): void
     {
         // Chi ha gia' tarato la stampante non se la vede cambiare sotto.
-        $zpl = (new ZplBuilder())->renderTemplate([
+        $zpl = (new ZplBuilder)->renderTemplate([
             'labelWidth' => 400,
             'labelHeight' => 300,
             'elements' => [],
@@ -340,7 +358,7 @@ final class ZplBuilderTest extends TestCase
 
     public function test_the_darkness_stays_within_what_the_printer_accepts(): void
     {
-        $zpl = (new ZplBuilder())->renderTemplate([
+        $zpl = (new ZplBuilder)->renderTemplate([
             'labelWidth' => 400,
             'labelHeight' => 300,
             'darkness' => 99,

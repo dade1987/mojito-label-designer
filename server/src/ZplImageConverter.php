@@ -12,7 +12,7 @@ class ZplImageConverter
     /**
      * @return array{totalBytes: int, bytesPerRow: int, hexData: string}|null
      */
-    public function fromBinary(string $binary, int $targetWidth = 0, int $targetHeight = 0, int $threshold = 128): ?array
+    public function fromBinary(string $binary, int $targetWidth = 0, int $targetHeight = 0, int $threshold = 128, int $rotation = 0): ?array
     {
         if ($binary === '') {
             return null;
@@ -22,6 +22,14 @@ class ZplImageConverter
 
         if ($image === false) {
             return null;
+        }
+
+        // Sui PNG/GIF a palette imagecolorat() restituisce l'indice di
+        // tavolozza, non il colore: la soglia letta su quegli indici produce
+        // un ammasso di punti senza senso al posto del logo. Convertire a
+        // truecolor fa leggere colori veri qualunque sia il formato sorgente.
+        if (! imageistruecolor($image)) {
+            imagepalettetotruecolor($image);
         }
 
         $width = imagesx($image);
@@ -38,11 +46,46 @@ class ZplImageConverter
 
             imagealphablending($resized, false);
             imagesavealpha($resized, true);
-            imagecopyresampled($resized, $image, 0, 0, 0, 0, $targetWidth, $targetHeight, $width, $height);
+
+            // L'anteprima mostra l'immagine con le proporzioni originali,
+            // centrata nel riquadro (object-fit: contain): qui si fa lo
+            // stesso, altrimenti la stampa esce stirata mentre lo schermo
+            // la mostrava giusta. Il margine resta trasparente, cioe' bianco
+            // sulla carta — il canvas truecolor nasce nero opaco.
+            $blank = imagecolorallocatealpha($resized, 0, 0, 0, 127);
+            imagefilledrectangle($resized, 0, 0, $targetWidth - 1, $targetHeight - 1, $blank === false ? 0 : $blank);
+
+            $scale = min($targetWidth / $width, $targetHeight / $height);
+            $drawWidth = max(1, (int) round($width * $scale));
+            $drawHeight = max(1, (int) round($height * $scale));
+            $offsetX = intdiv($targetWidth - $drawWidth, 2);
+            $offsetY = intdiv($targetHeight - $drawHeight, 2);
+
+            imagecopyresampled($resized, $image, $offsetX, $offsetY, 0, 0, $drawWidth, $drawHeight, $width, $height);
             imagedestroy($image);
             $image = $resized;
             $width = $targetWidth;
             $height = $targetHeight;
+        }
+
+        // ^GF non conosce l'orientamento: la rotazione va fatta sui pixel
+        // prima di convertirli. Come per i testi ZPL, il riquadro ruotato
+        // tiene fermo l'angolo in alto a sinistra su ^FO (per 90/270 le
+        // dimensioni si scambiano), che e' cio' che l'anteprima disegna.
+        if ($rotation === 90 || $rotation === 180 || $rotation === 270) {
+            imagealphablending($image, false);
+            imagesavealpha($image, true);
+            $blank = imagecolorallocatealpha($image, 0, 0, 0, 127);
+            // GD ruota in senso antiorario, la rotazione scelta e' oraria.
+            $rotated = imagerotate($image, 360 - $rotation, $blank === false ? 0 : $blank);
+
+            if ($rotated !== false) {
+                imagedestroy($image);
+                $image = $rotated;
+                imagesavealpha($image, true);
+                $width = imagesx($image);
+                $height = imagesy($image);
+            }
         }
 
         $bytesPerRow = (int) ceil($width / 8);
@@ -76,11 +119,6 @@ class ZplImageConverter
 
             if ($bit !== 7) {
                 $hexLines[] = sprintf('%02X', $byte);
-            }
-
-            while (count($hexLines) % $bytesPerRow !== 0 && $bit === 7) {
-                // padding row già completa
-                break;
             }
         }
 

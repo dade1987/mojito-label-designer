@@ -27,6 +27,7 @@ export function createEmptyTemplate() {
     labelWidth: 600,
     labelHeight: 400,
     dpi: 203,
+    mediaTracking: 'gap',
     dataSources: [
       { name: 'title', label: 'Titolo', defaultValue: '' },
       { name: 'product', label: 'Prodotto', defaultValue: '' },

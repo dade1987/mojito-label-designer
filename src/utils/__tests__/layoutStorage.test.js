@@ -57,6 +57,30 @@ describe('layoutStorage', () => {
     expect(saved.originY).toBe(8)
   })
 
+  it('sanitizeTemplateForSave conserva avanzamento carta, intensità e velocità', () => {
+    const saved = sanitizeTemplateForSave({
+      id: 't3',
+      name: 'Stampa',
+      mediaTracking: 'continuous',
+      darkness: 22,
+      printSpeed: 3,
+      dataSources: [],
+      elements: [],
+    })
+
+    expect(saved.mediaTracking).toBe('continuous')
+    expect(saved.darkness).toBe(22)
+    expect(saved.printSpeed).toBe(3)
+  })
+
+  it('sanitizeTemplateForSave applica i default di stampa ai layout vecchi', () => {
+    const saved = sanitizeTemplateForSave({ id: 't4', name: 'Vecchio', dataSources: [], elements: [] })
+
+    expect(saved.mediaTracking).toBe('gap')
+    expect(saved.darkness).toBe(0)
+    expect(saved.printSpeed).toBe(0)
+  })
+
   it('save/load/delete local layout', () => {
     const saved = saveLocalLayout({ id: 'a', name: 'A', elements: [], dataSources: [] })
     expect(saved.id).toBe('a')

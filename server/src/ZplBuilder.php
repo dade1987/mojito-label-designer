@@ -53,6 +53,22 @@ final class ZplBuilder
             $lines[] = sprintf('^LL%d', $height);
         }
 
+        // Senza dichiarare il tipo di carta, la stampante avanza di ^LL punti
+        // e basta: sulle etichette adesive con gap l'errore di qualche punto
+        // si accumula ad ogni stampa e il testo scivola fuori dall'etichetta.
+        // ^MNY le fa riallineare al gap ad ogni etichetta. Chi usa carta
+        // continua o tacca nera lo dichiara nel layout.
+        $mediaCommand = match (TypeCaster::string($template['mediaTracking'] ?? 'gap', 'gap')) {
+            'continuous' => '^MNN',
+            'mark' => '^MNM',
+            'none' => '',
+            default => '^MNY',
+        };
+
+        if ($mediaCommand !== '') {
+            $lines[] = $mediaCommand;
+        }
+
         // In ZPL grezzo l'intensita' e la velocita' restano quelle memorizzate
         // nella stampante: e' il motivo per cui le etichette escono sbiadite
         // mentre da BarTender, che le imposta dal driver, escono nere. Si
@@ -263,6 +279,7 @@ final class ZplBuilder
         $threshold = min(255, max(1, TypeCaster::int($element['threshold'] ?? 128, 128)));
         $targetWidth = TypeCaster::int($element['width'] ?? 0);
         $targetHeight = TypeCaster::int($element['height'] ?? 0);
+        $rotation = ElementRotation::degreesForElement($element);
 
         if (str_starts_with($imageData, 'data:')) {
             $commaPos = strpos($imageData, ',');
@@ -277,9 +294,9 @@ final class ZplBuilder
                 return '';
             }
 
-            $graphic = $converter->fromBinary($raw, $targetWidth, $targetHeight, $threshold);
+            $graphic = $converter->fromBinary($raw, $targetWidth, $targetHeight, $threshold, $rotation);
         } else {
-            $graphic = $converter->fromBinary(base64_decode($imageData, true) ?: '', $targetWidth, $targetHeight, $threshold);
+            $graphic = $converter->fromBinary(base64_decode($imageData, true) ?: '', $targetWidth, $targetHeight, $threshold, $rotation);
         }
 
         if ($graphic === null) {
