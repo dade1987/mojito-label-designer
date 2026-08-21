@@ -80,6 +80,33 @@ final class ZplBuilderTest extends TestCase
         $this->assertStringNotContainsString('^MN', $none);
     }
 
+    public function test_large_images_are_split_into_small_graphic_strips(): void
+    {
+        if (! function_exists('imagecreatetruecolor')) {
+            $this->markTestSkipped('GD extension required.');
+        }
+
+        // 8 px di larghezza = 2 byte per riga: 1200 righe superano i 2000
+        // byte per striscia, quindi servono 2 campi ^GFA impilati.
+        $image = imagecreatetruecolor(8, 1200);
+        $this->assertNotFalse($image);
+
+        ob_start();
+        imagepng($image);
+        $png = ob_get_clean();
+        imagedestroy($image);
+
+        $zpl = $this->builder->renderTemplate([
+            'elements' => [
+                ['type' => 'image', 'x' => 10, 'y' => 20, 'imageData' => 'data:image/png;base64,'.base64_encode($png ?: '')],
+            ],
+        ]);
+
+        $this->assertSame(2, substr_count($zpl, '^GFA'));
+        $this->assertStringContainsString('^FO10,20^GFA,2000,2000,2,', $zpl);
+        $this->assertStringContainsString('^FO10,1020^GFA,400,400,2,', $zpl);
+    }
+
     public function test_render_template_throws_on_invalid_elements(): void
     {
         $this->expectException(InvalidArgumentException::class);

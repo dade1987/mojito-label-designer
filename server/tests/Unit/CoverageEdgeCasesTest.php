@@ -75,7 +75,8 @@ final class CoverageEdgeCasesTest extends TestCase
 
         $resized = $converter->fromBinary($png ?: '', 2, 2);
         $this->assertIsArray($resized);
-        $this->assertSame(2, $resized['totalBytes']);
+        // 2 righe da 2 byte: le righe grafiche sono allineate a byte pari.
+        $this->assertSame(4, $resized['totalBytes']);
     }
 
     public function test_template_repository_list_ignores_unreadable_files(): void

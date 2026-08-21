@@ -88,12 +88,22 @@ class ZplImageConverter
             }
         }
 
+        // Righe allineate a byte pari: alcune emulazioni ZPL non Zebra
+        // gestiscono male le righe grafiche di lunghezza dispari e stampano
+        // l'immagine deformata. Il padding e' bianco, quindi su una
+        // stampante conforme non cambia nulla.
         $bytesPerRow = (int) ceil($width / 8);
+
+        if ($bytesPerRow % 2 !== 0) {
+            $bytesPerRow++;
+        }
+
         $hexLines = [];
 
         for ($y = 0; $y < $height; $y++) {
             $byte = 0;
             $bit = 7;
+            $rowBytes = 0;
 
             for ($x = 0; $x < $width; $x++) {
                 $rgb = imagecolorat($image, $x, $y);
@@ -114,11 +124,18 @@ class ZplImageConverter
                     $hexLines[] = sprintf('%02X', $byte);
                     $byte = 0;
                     $bit = 7;
+                    $rowBytes++;
                 }
             }
 
             if ($bit !== 7) {
                 $hexLines[] = sprintf('%02X', $byte);
+                $rowBytes++;
+            }
+
+            while ($rowBytes < $bytesPerRow) {
+                $hexLines[] = '00';
+                $rowBytes++;
             }
         }
 

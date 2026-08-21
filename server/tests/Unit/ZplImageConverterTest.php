@@ -27,8 +27,9 @@ final class ZplImageConverterTest extends TestCase
         $graphic = $converter->fromBinary($png ?: '', 1, 1);
 
         $this->assertIsArray($graphic);
-        $this->assertSame(1, $graphic['bytesPerRow']);
-        $this->assertSame(1, $graphic['totalBytes']);
+        // Righe allineate a byte pari: 1 px occupa comunque 2 byte per riga.
+        $this->assertSame(2, $graphic['bytesPerRow']);
+        $this->assertSame(2, $graphic['totalBytes']);
         $this->assertMatchesRegularExpression('/^[0-9A-F]+$/', $graphic['hexData']);
     }
 
@@ -42,8 +43,8 @@ final class ZplImageConverterTest extends TestCase
         $graphic = $converter->fromBinary($png ?: '', 2, 2);
 
         $this->assertIsArray($graphic);
-        $this->assertSame(1, $graphic['bytesPerRow']);
-        $this->assertSame(2, $graphic['totalBytes']);
+        $this->assertSame(2, $graphic['bytesPerRow']);
+        $this->assertSame(4, $graphic['totalBytes']);
     }
 
     public function test_from_binary_handles_partial_row_bits(): void
@@ -64,7 +65,7 @@ final class ZplImageConverterTest extends TestCase
         $graphic = $converter->fromBinary($png ?: '');
 
         $this->assertIsArray($graphic);
-        $this->assertSame(1, $graphic['bytesPerRow']);
+        $this->assertSame(2, $graphic['bytesPerRow']);
     }
 
     public function test_from_binary_returns_null_when_resize_canvas_fails(): void
@@ -125,7 +126,7 @@ final class ZplImageConverterTest extends TestCase
         $graphic = $converter->fromBinary($png ?: '');
 
         $this->assertIsArray($graphic);
-        $this->assertSame('0000', $graphic['hexData']);
+        $this->assertSame('00000000', $graphic['hexData']);
     }
 
     public function test_resize_keeps_aspect_ratio_like_preview(): void
@@ -167,7 +168,7 @@ final class ZplImageConverterTest extends TestCase
             $this->markTestSkipped('GD extension required.');
         }
 
-        // 16x8 ruotata di 90 gradi diventa 8x16: una riga passa da 2 byte a 1.
+        // 16x8 ruotata di 90 gradi diventa 8x16: 16 righe invece di 8.
         $image = imagecreatetruecolor(16, 8);
         $this->assertNotFalse($image);
         $black = imagecolorallocate($image, 0, 0, 0);
@@ -182,9 +183,9 @@ final class ZplImageConverterTest extends TestCase
         $graphic = $converter->fromBinary($png ?: '', 0, 0, 128, 90);
 
         $this->assertIsArray($graphic);
-        $this->assertSame(1, $graphic['bytesPerRow']);
-        $this->assertSame(16, $graphic['totalBytes']);
-        $this->assertSame(str_repeat('FF', 16), $graphic['hexData']);
+        $this->assertSame(2, $graphic['bytesPerRow']);
+        $this->assertSame(32, $graphic['totalBytes']);
+        $this->assertSame(str_repeat('FF00', 16), $graphic['hexData']);
     }
 
     public function test_rotation_180_keeps_dimensions(): void
@@ -210,8 +211,8 @@ final class ZplImageConverterTest extends TestCase
         $graphic = $converter->fromBinary($png ?: '', 0, 0, 128, 180);
 
         $this->assertIsArray($graphic);
-        $this->assertSame(1, $graphic['bytesPerRow']);
-        $this->assertSame('00FF', $graphic['hexData']);
+        $this->assertSame(2, $graphic['bytesPerRow']);
+        $this->assertSame('0000FF00', $graphic['hexData']);
     }
 
     public function test_from_binary_pads_short_hex_data(): void

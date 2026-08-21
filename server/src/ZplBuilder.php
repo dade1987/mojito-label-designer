@@ -15,6 +15,11 @@ use InvalidArgumentException;
 final class ZplBuilder
 {
     /**
+     * Dimensione massima (in byte immagine) di una singola striscia ^GFA.
+     */
+    private const MAX_GRAPHIC_FIELD_BYTES = 2000;
+
+    /**
      * @param  array<string, mixed>  $data
      */
     public function renderDefaultLabel(array $data): string
@@ -303,15 +308,42 @@ final class ZplBuilder
             return '';
         }
 
-        return sprintf(
-            '^FO%d,%d^GFA,%d,%d,%d,%s^FS',
-            $x,
-            $y,
-            $graphic['totalBytes'],
-            $graphic['totalBytes'],
-            $graphic['bytesPerRow'],
-            $graphic['hexData']
-        );
+        return $this->renderGraphicFields($x, $y, $graphic);
+    }
+
+    /**
+     * Un logo intero e' un ^GFA da decine di migliaia di caratteri su una
+     * riga sola: le stampanti Zebra lo leggono, ma alcune emulazioni (Apix)
+     * hanno un buffer piu' corto e stampano l'immagine maciullata. Spezzata
+     * in strisce orizzontali piccole, una sotto l'altra, il risultato su un
+     * renderer conforme e' identico e anche i parser limitati ce la fanno.
+     *
+     * @param  array{totalBytes: int, bytesPerRow: int, hexData: string}  $graphic
+     */
+    private function renderGraphicFields(int $x, int $y, array $graphic): string
+    {
+        $bytesPerRow = $graphic['bytesPerRow'];
+        $height = intdiv($graphic['totalBytes'], $bytesPerRow);
+        $rowsPerStrip = max(1, intdiv(self::MAX_GRAPHIC_FIELD_BYTES, $bytesPerRow));
+
+        $fields = [];
+
+        for ($startRow = 0; $startRow < $height; $startRow += $rowsPerStrip) {
+            $rows = min($rowsPerStrip, $height - $startRow);
+            $stripBytes = $rows * $bytesPerRow;
+
+            $fields[] = sprintf(
+                '^FO%d,%d^GFA,%d,%d,%d,%s^FS',
+                $x,
+                $y + $startRow,
+                $stripBytes,
+                $stripBytes,
+                $bytesPerRow,
+                substr($graphic['hexData'], $startRow * $bytesPerRow * 2, $stripBytes * 2)
+            );
+        }
+
+        return implode("\n", $fields);
     }
 
     /**
