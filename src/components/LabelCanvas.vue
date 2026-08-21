@@ -1,5 +1,6 @@
 <script setup>
 import { nextTick, ref, computed } from 'vue'
+import { ZOOM_MAX, ZOOM_MIN, ZOOM_STEP, clampZoom } from '../utils/zoomRange.js'
 import {
   BARCODE_TEXT_FONT_FAMILY,
   buildElementDisplayValues,
@@ -44,9 +45,7 @@ const editInputRef = ref(null)
 const marquee = ref(null)
 
 // Zoom scelto dall'utente: 1 = dimensione reale (grande come su carta).
-const ZOOM_MIN = 0.25
-const ZOOM_MAX = 6
-const ZOOM_STEP = 1.25
+// Limiti e arrotondamento stanno in zoomRange.js, cosi' sono verificabili.
 const zoom = ref(1)
 
 // px CSS per mm dello schermo (calibrabile col righello per la dimensione reale).
@@ -60,6 +59,10 @@ const CARD_MM_H = 53.98
 const baseScale = computed(() => (pxPerMm.value * 25.4) / (template.value.dpi || 203))
 const scale = computed(() => baseScale.value * zoom.value)
 const zoomPercent = computed(() => Math.round(zoom.value * 100))
+// Ai limiti il pulsante si spegne: premere e non veder succedere niente fa
+// pensare a un guasto.
+const canZoomIn = computed(() => zoom.value < ZOOM_MAX)
+const canZoomOut = computed(() => zoom.value > ZOOM_MIN)
 const cardStyle = computed(() => ({
   width: `${CARD_MM_W * pxPerMm.value}px`,
   height: `${CARD_MM_H * pxPerMm.value}px`,
@@ -73,10 +76,6 @@ function saveCalibration() {
 function resetCalibration() {
   resetScreenCalibration()
   pxPerMm.value = DEFAULT_PX_PER_MM
-}
-
-function clampZoom(value) {
-  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value))
 }
 
 function zoomIn() {
@@ -409,14 +408,26 @@ function displayBarcodeValue(element) {
         {{ dotsToMm(template.labelWidth, template.dpi) }} × {{ dotsToMm(template.labelHeight, template.dpi) }} mm
       </span>
       <span class="zoom-ctrl" role="group" aria-label="Zoom anteprima">
-        <button type="button" title="Riduci zoom" aria-label="Riduci zoom" @click="zoomOut">−</button>
+        <button
+          type="button"
+          title="Riduci zoom"
+          aria-label="Riduci zoom"
+          :disabled="!canZoomOut"
+          @click="zoomOut"
+        >−</button>
         <button
           type="button"
           class="zoom-value"
           title="Torna alla dimensione reale (come su carta)"
           @click="zoomReal"
         >{{ zoomPercent }}%</button>
-        <button type="button" title="Aumenta zoom" aria-label="Aumenta zoom" @click="zoomIn">+</button>
+        <button
+          type="button"
+          title="Aumenta zoom"
+          aria-label="Aumenta zoom"
+          :disabled="!canZoomIn"
+          @click="zoomIn"
+        >+</button>
       </span>
       <button
         type="button"
