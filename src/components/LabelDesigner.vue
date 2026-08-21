@@ -28,6 +28,7 @@ import {
 } from '../utils/templateStore.js'
 import { cloneTemplateState } from '../utils/cloneSerializable.js'
 import { hasWork, startNewLayout } from '../utils/newLayout.js'
+import { resolutionForPrinter, shouldWarnResolution } from '../utils/printerResolution.js'
 import {
   deleteLocalLayout,
   importLayoutFromFile,
@@ -62,6 +63,8 @@ const template = ref(null)
 const selectedIds = ref([])
 const printers = ref([])
 const selectedPrinter = ref('')
+// Risoluzione dichiarata dal server per ogni stampante conosciuta.
+const printerResolutions = ref({})
 const printerPlatform = ref('')
 const zplPreview = ref('')
 const statusMessage = ref('')
@@ -119,6 +122,21 @@ const selectedDpi = computed({
     }
   },
 })
+
+const printerDpi = computed(() => resolutionForPrinter(printerResolutions.value, selectedPrinter.value))
+
+// Il disegno a una risoluzione diversa da quella di stampa esce di misura
+// sbagliata, e sullo schermo sembra tutto a posto: e' il caso che merita un
+// avviso, non un silenzio.
+const resolutionMismatch = computed(() =>
+  shouldWarnResolution(template.value?.dpi ?? 203, printerDpi.value)
+)
+
+function applyPrinterResolution() {
+  if (!printerDpi.value || !template.value) return
+  selectedDpi.value = printerDpi.value
+  showStatus(`Disegno riportato a ${printerDpi.value} dpi, come la stampante`, 'success')
+}
 
 const dpiOptions = computed(() => {
   const current = selectedDpi.value
@@ -208,12 +226,13 @@ onMounted(async () => {
   window.addEventListener('keydown', handleKeydown)
 
   try {
-    const [{ printers: list, platform, diagnostics }, defaultTemplate, { templates }] = await Promise.all([
+    const [{ printers: list, platform, diagnostics, printerResolutions: resolutions }, defaultTemplate, { templates }] = await Promise.all([
       fetchPrinters(),
       fetchDefaultTemplate(),
       fetchTemplates().catch(() => ({ templates: [] })),
     ])
     printers.value = Array.isArray(list) ? list : []
+    printerResolutions.value = resolutions && typeof resolutions === 'object' ? resolutions : {}
     printerPlatform.value = platform ?? ''
     selectedPrinter.value = pickDefaultPrinter(printers.value)
     if (printers.value.length === 0) {
@@ -1300,6 +1319,18 @@ function buildApiExample() {
             </option>
           </select>
         </label>
+
+        <p v-if="printerDpi && !resolutionMismatch" class="hint ok-text">
+          {{ selectedPrinter }} stampa a {{ printerDpi }} dpi: il disegno è allineato.
+        </p>
+
+        <div v-else-if="resolutionMismatch" class="hint warn-box">
+          <strong>{{ selectedPrinter }} stampa a {{ printerDpi }} dpi</strong>, il disegno è a
+          {{ selectedDpi }}. Stampata così, l'etichetta uscirà di misura diversa da quella che vedi.
+          <button type="button" class="btn ghost compact" @click="applyPrinterResolution">
+            Porta il disegno a {{ printerDpi }} dpi
+          </button>
+        </div>
         <p class="hint">
           Cambiando risoluzione, etichetta ed elementi vengono riscalati per
           mantenere le stesse misure in mm.

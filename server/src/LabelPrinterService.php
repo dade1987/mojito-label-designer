@@ -62,8 +62,22 @@ final class LabelPrinterService
     public function listPrintersInfo(): array
     {
         $printers = $this->listPrinters();
+        // La risoluzione di ogni stampante, dove si puo' sapere: disegnare a
+        // 203 dpi cio' che verra' stampato a 300 produce etichette di misura
+        // sbagliata, e il designer non ha modo di accorgersene da solo.
+        $resolutions = [];
+        foreach ($printers as $printer) {
+            $name = is_scalar($printer) ? (string) $printer : '';
+            $dpi = $name === '' ? null : PrinterResolution::forPrinter($name);
+
+            if ($dpi !== null) {
+                $resolutions[$name] = $dpi;
+            }
+        }
+
         $info = [
             'printers' => $printers,
+            'printerResolutions' => $resolutions,
             'platform' => PrinterPlatform::osFamily(),
         ];
 

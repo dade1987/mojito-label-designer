@@ -35,3 +35,17 @@ select,
 textarea {
   font-family: inherit;
 }
+
+/* Avviso di risoluzione: e' l'errore che non da' segnali finche' non si
+   guarda l'etichetta stampata, quindi va visto. */
+.hint.warn-box {
+  border: 1px solid #d97706;
+  background: rgba(217, 119, 6, 0.08);
+  border-radius: 6px;
+  padding: 0.6rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.hint.ok-text { color: #15803d; }
