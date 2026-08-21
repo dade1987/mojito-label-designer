@@ -1263,6 +1263,16 @@ function buildApiExample() {
               </select>
             </label>
             <label>
+              Rotazione
+              <select v-model.number="selectedElement.rotation">
+                <option :value="0">Nessuna</option>
+                <option :value="90">90° in senso orario</option>
+                <option :value="180">Capovolto</option>
+                <option :value="270">270°</option>
+              </select>
+              <small class="hint">La stampante conosce solo questi quattro orientamenti.</small>
+            </label>
+            <label>
               Tipo
               <select v-model="selectedElement.barcodeType">
                 <option value="code128">Code 128</option>
@@ -1390,6 +1400,16 @@ function buildApiExample() {
             </option>
             <option :value="CUSTOM_FORMAT_ID">Personalizzato</option>
           </select>
+        </label>
+        <label>
+          Intensità di stampa
+          <input v-model.number="template.darkness" type="number" min="0" max="30" step="1" />
+          <small class="hint">0 lascia la taratura della stampante. Se le etichette escono sbiadite, alza fino a 20-25.</small>
+        </label>
+        <label>
+          Velocità di stampa
+          <input v-model.number="template.printSpeed" type="number" min="0" max="14" step="1" />
+          <small class="hint">0 lascia quella della stampante. Più lenta stampa più nero.</small>
         </label>
         <label>
           Risoluzione stampante

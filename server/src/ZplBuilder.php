@@ -53,6 +53,21 @@ final class ZplBuilder
             $lines[] = sprintf('^LL%d', $height);
         }
 
+        // In ZPL grezzo l'intensita' e la velocita' restano quelle memorizzate
+        // nella stampante: e' il motivo per cui le etichette escono sbiadite
+        // mentre da BarTender, che le imposta dal driver, escono nere. Si
+        // emettono solo se qualcuno le ha scelte, per non cambiare la taratura
+        // a chi l'ha gia' fatta.
+        $darkness = TypeCaster::int($template['darkness'] ?? 0, 0);
+        if ($darkness > 0) {
+            $lines[] = sprintf('^MD%d', min(30, $darkness));
+        }
+
+        $printSpeed = TypeCaster::int($template['printSpeed'] ?? 0, 0);
+        if ($printSpeed > 0) {
+            $lines[] = sprintf('^PR%d', min(14, $printSpeed));
+        }
+
         $originX = max(0, TypeCaster::int($template['originX'] ?? 0));
         $originY = max(0, TypeCaster::int($template['originY'] ?? 0));
 
@@ -113,6 +128,7 @@ final class ZplBuilder
         $value = $this->resolveValue($element, $values);
         $font = TypeCaster::string($element['font'] ?? '0', '0');
         $height = TypeCaster::int($element['fontHeight'] ?? 30, 30);
+        $orientation = ElementRotation::forElement($element);
         $width = TypeCaster::int($element['fontWidth'] ?? 30, 30);
         $prefix = TypeCaster::string($element['prefix'] ?? '');
         $suffix = TypeCaster::string($element['suffix'] ?? '');
@@ -121,10 +137,10 @@ final class ZplBuilder
 
         $text = $this->escapeFieldData($prefix.$value.$suffix);
 
-        $lines = [sprintf('^FO%d,%d^A%sN,%d,%d^FD%s^FS', $x, $y, $font, $height, $width, $text)];
+        $lines = [sprintf('^FO%d,%d^A%s%s,%d,%d^FD%s^FS', $x, $y, $font, $orientation, $height, $width, $text)];
 
         if ($bold) {
-            $lines[] = sprintf('^FO%d,%d^A%sN,%d,%d^FD%s^FS', $x + 1, $y, $font, $height, $width, $text);
+            $lines[] = sprintf('^FO%d,%d^A%s%s,%d,%d^FD%s^FS', $x + 1, $y, $font, $orientation, $height, $width, $text);
         }
 
         if ($underline) {
@@ -166,20 +182,22 @@ final class ZplBuilder
         // senza impostarlo esce con quello predefinito della stampante, che e'
         // minuscolo. Si emette solo se qualcuno ha chiesto una dimensione,
         // per non cambiare l'aspetto delle etichette gia' in uso.
+        $orientation = ElementRotation::forElement($element);
         $textHeight = TypeCaster::int($element['textHeight'] ?? 0, 0);
         $font = $textHeight > 0
-            ? sprintf('^A0N,%d,%d', $textHeight, (int) round($textHeight * 0.6))
+            ? sprintf('^A0%s,%d,%d', $orientation, $textHeight, (int) round($textHeight * 0.6))
             : '';
 
         $data = $this->escapeFieldData($value);
 
         if ($barcodeType === 'code39') {
             return sprintf(
-                '^FO%d,%d%s^BY%d^B3N,N,%d,%s,N^FD%s^FS',
+                '^FO%d,%d%s^BY%d^B3%s,N,%d,%s,N^FD%s^FS',
                 $x,
                 $y,
                 $font,
                 $moduleWidth,
+                $orientation,
                 $height,
                 $showText,
                 $data
@@ -187,11 +205,12 @@ final class ZplBuilder
         }
 
         return sprintf(
-            '^FO%d,%d%s^BY%d^BCN,%d,%s,N,N^FD%s^FS',
+            '^FO%d,%d%s^BY%d^BC%s,%d,%s,N,N^FD%s^FS',
             $x,
             $y,
             $font,
             $moduleWidth,
+            $orientation,
             $height,
             $showText,
             $data
@@ -216,7 +235,15 @@ final class ZplBuilder
 
         $data = $this->escapeFieldData($value);
 
-        return sprintf('^FO%d,%d^BQN,2,%d^FD%sA,%s^FS', $x, $y, $magnification, $errorCorrection, $data);
+        return sprintf(
+            '^FO%d,%d^BQ%s,2,%d^FD%sA,%s^FS',
+            $x,
+            $y,
+            ElementRotation::forElement($element),
+            $magnification,
+            $errorCorrection,
+            $data
+        );
     }
 
     /**

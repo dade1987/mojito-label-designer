@@ -337,10 +337,21 @@ function onElementClick(event, id) {
 }
 
 function elementStyle(element) {
-  return {
+  const style = {
     left: `${element.x * RENDER_SCALE}px`,
     top: `${element.y * RENDER_SCALE}px`,
   }
+
+  // Se la stampante lo ruotera', il disegno deve ruotare: mostrarlo dritto
+  // sarebbe l'ennesima promessa che la carta non mantiene. L'origine e'
+  // l'angolo in alto a sinistra, come in ZPL, dove il punto ^FO resta fermo.
+  const rotation = Number(element.rotation)
+  if (Number.isFinite(rotation) && rotation % 360 !== 0) {
+    style.transform = `rotate(${rotation % 360}deg)`
+    style.transformOrigin = 'top left'
+  }
+
+  return style
 }
 
 function textStyle(element) {

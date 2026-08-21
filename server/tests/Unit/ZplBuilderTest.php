@@ -296,4 +296,57 @@ final class ZplBuilderTest extends TestCase
 
         self::assertStringContainsString('^A0N,33,', $zpl);
     }
+
+    public function test_the_darkness_can_be_set_so_the_print_is_not_faded(): void
+    {
+        // In ZPL grezzo la stampa usa l'intensita' memorizzata nella
+        // stampante, spesso bassa: e' il motivo per cui le etichette escono
+        // sbiadite mentre da BarTender, che la imposta dal driver, escono
+        // nere.
+        $zpl = (new ZplBuilder())->renderTemplate([
+            'labelWidth' => 400,
+            'labelHeight' => 300,
+            'darkness' => 20,
+            'elements' => [],
+        ], []);
+
+        self::assertStringContainsString('^MD20', $zpl);
+    }
+
+    public function test_the_print_speed_can_be_set_because_fast_prints_lighter(): void
+    {
+        $zpl = (new ZplBuilder())->renderTemplate([
+            'labelWidth' => 400,
+            'labelHeight' => 300,
+            'printSpeed' => 2,
+            'elements' => [],
+        ], []);
+
+        self::assertStringContainsString('^PR2', $zpl);
+    }
+
+    public function test_without_settings_nothing_is_imposed_on_the_printer(): void
+    {
+        // Chi ha gia' tarato la stampante non se la vede cambiare sotto.
+        $zpl = (new ZplBuilder())->renderTemplate([
+            'labelWidth' => 400,
+            'labelHeight' => 300,
+            'elements' => [],
+        ], []);
+
+        self::assertStringNotContainsString('^MD', $zpl);
+        self::assertStringNotContainsString('^PR', $zpl);
+    }
+
+    public function test_the_darkness_stays_within_what_the_printer_accepts(): void
+    {
+        $zpl = (new ZplBuilder())->renderTemplate([
+            'labelWidth' => 400,
+            'labelHeight' => 300,
+            'darkness' => 99,
+            'elements' => [],
+        ], []);
+
+        self::assertStringContainsString('^MD30', $zpl);
+    }
 }
