@@ -1375,6 +1375,21 @@ function buildApiExample() {
               />
             </label>
             <label>
+              Soglia bianco/nero
+              <input
+                :value="selectedElement.threshold ?? 128"
+                type="range"
+                min="16"
+                max="240"
+                step="1"
+                @input="selectedElement.threshold = Number($event.target.value)"
+              />
+              <small class="hint">
+                {{ selectedElement.threshold ?? 128 }} — la stampante fa punti neri o niente.
+                Più alta, più nero: regolala guardando l'anteprima.
+              </small>
+            </label>
+            <label>
               Immagine
               <input type="file" accept="image/*" @change="onImageUpload" />
             </label>

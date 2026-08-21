@@ -12,7 +12,7 @@ class ZplImageConverter
     /**
      * @return array{totalBytes: int, bytesPerRow: int, hexData: string}|null
      */
-    public function fromBinary(string $binary, int $targetWidth = 0, int $targetHeight = 0): ?array
+    public function fromBinary(string $binary, int $targetWidth = 0, int $targetHeight = 0, int $threshold = 128): ?array
     {
         if ($binary === '') {
             return null;
@@ -59,7 +59,7 @@ class ZplImageConverter
                 $blue = $rgb & 0xFF;
                 $alpha = ($rgb & 0x7F000000) >> 24;
                 $luminance = (int) round(0.299 * $red + 0.587 * $green + 0.114 * $blue);
-                $isBlack = $alpha < 127 && $luminance < 128;
+                $isBlack = $alpha < 127 && $luminance < $threshold;
 
                 if ($isBlack) {
                     $byte |= 1 << $bit;

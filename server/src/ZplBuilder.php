@@ -258,6 +258,9 @@ final class ZplBuilder
         }
 
         $converter = new ZplImageConverter;
+        // La soglia scelta nel designer: e' quella che l'anteprima mostra,
+        // quindi stampa e schermo dicono la stessa cosa.
+        $threshold = min(255, max(1, TypeCaster::int($element['threshold'] ?? 128, 128)));
         $targetWidth = TypeCaster::int($element['width'] ?? 0);
         $targetHeight = TypeCaster::int($element['height'] ?? 0);
 
@@ -274,9 +277,9 @@ final class ZplBuilder
                 return '';
             }
 
-            $graphic = $converter->fromBinary($raw, $targetWidth, $targetHeight);
+            $graphic = $converter->fromBinary($raw, $targetWidth, $targetHeight, $threshold);
         } else {
-            $graphic = $converter->fromBinary(base64_decode($imageData, true) ?: '', $targetWidth, $targetHeight);
+            $graphic = $converter->fromBinary(base64_decode($imageData, true) ?: '', $targetWidth, $targetHeight, $threshold);
         }
 
         if ($graphic === null) {

@@ -1,5 +1,6 @@
 <script setup>
 import { nextTick, ref, computed } from 'vue'
+import { DEFAULT_THRESHOLD, thresholdPixels } from '../utils/monochrome.js'
 import { ZOOM_MAX, ZOOM_MIN, ZOOM_STEP, clampZoom } from '../utils/zoomRange.js'
 import {
   BARCODE_TEXT_FONT_FAMILY,
@@ -336,6 +337,48 @@ function onElementClick(event, id) {
   }
 }
 
+// L'anteprima deve mostrare l'immagine come uscira' dalla stampante, che fa
+// punti neri o niente: vederla a colori nascondeva com'e' davvero il
+// risultato finche' non si aveva l'etichetta in mano. La conversione e'
+// costosa, quindi il risultato viene tenuto da parte finche' immagine e
+// soglia non cambiano.
+const monochromeCache = ref({})
+
+function monochromeSrc(element) {
+  const source = element.imageData
+  if (!source) return source
+
+  const threshold = Number.isFinite(Number(element.threshold))
+    ? Number(element.threshold)
+    : DEFAULT_THRESHOLD
+  const key = `${element.id}:${threshold}:${source.length}`
+  const cached = monochromeCache.value[key]
+
+  if (cached) return cached
+
+  const image = new Image()
+  image.onload = () => {
+    const canvas = document.createElement('canvas')
+    canvas.width = image.naturalWidth
+    canvas.height = image.naturalHeight
+
+    const context = canvas.getContext('2d')
+    if (!context) return
+
+    context.drawImage(image, 0, 0)
+    const data = context.getImageData(0, 0, canvas.width, canvas.height)
+    data.data.set(thresholdPixels(data.data, threshold))
+    context.putImageData(data, 0, 0)
+
+    monochromeCache.value = { ...monochromeCache.value, [key]: canvas.toDataURL('image/png') }
+  }
+  image.src = source
+
+  // Finche' la conversione non e' pronta si mostra l'originale: meglio
+  // qualcosa di leggermente diverso che un buco nel disegno.
+  return source
+}
+
 function elementStyle(element) {
   const style = {
     left: `${element.x * RENDER_SCALE}px`,
@@ -565,7 +608,7 @@ function displayBarcodeValue(element) {
         <template v-else-if="element.type === 'image'">
           <img
             v-if="element.imageData"
-            :src="element.imageData"
+            :src="monochromeSrc(element)"
             alt="logo"
             :style="imageStyle(element)"
           />
