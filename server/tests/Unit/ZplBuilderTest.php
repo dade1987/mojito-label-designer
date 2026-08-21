@@ -242,4 +242,58 @@ final class ZplBuilderTest extends TestCase
         $this->assertStringContainsString('\5E', $zpl);
         $this->assertStringContainsString('\7E', $zpl);
     }
+
+    public function test_the_readable_line_under_a_barcode_can_be_enlarged(): void
+    {
+        // La riga leggibile usa il font attivo al momento: senza impostarlo
+        // esce con quello predefinito della stampante, minuscolo.
+        $zpl = (new ZplBuilder())->renderTemplate([
+            'labelWidth' => 400,
+            'labelHeight' => 300,
+            'elements' => [[
+                'type' => 'barcode',
+                'x' => 10,
+                'y' => 20,
+                'staticValue' => 'ABC123',
+                'textHeight' => 40,
+            ]],
+        ], []);
+
+        self::assertStringContainsString('^A0N,40,', $zpl);
+    }
+
+    public function test_without_a_size_the_barcode_stays_as_it_was(): void
+    {
+        // Non si cambia l'aspetto delle etichette gia' in uso: il font si
+        // imposta solo se qualcuno lo ha chiesto.
+        $zpl = (new ZplBuilder())->renderTemplate([
+            'labelWidth' => 400,
+            'labelHeight' => 300,
+            'elements' => [[
+                'type' => 'barcode',
+                'x' => 10,
+                'y' => 20,
+                'staticValue' => 'ABC123',
+            ]],
+        ], []);
+
+        self::assertStringNotContainsString('^A0N', $zpl);
+    }
+
+    public function test_the_readable_line_size_is_an_integer_like_everything_in_zpl(): void
+    {
+        $zpl = (new ZplBuilder())->renderTemplate([
+            'labelWidth' => 400,
+            'labelHeight' => 300,
+            'elements' => [[
+                'type' => 'barcode',
+                'x' => 10,
+                'y' => 20,
+                'staticValue' => 'ABC123',
+                'textHeight' => 33.7,
+            ]],
+        ], []);
+
+        self::assertStringContainsString('^A0N,33,', $zpl);
+    }
 }

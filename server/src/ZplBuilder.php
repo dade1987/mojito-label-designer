@@ -162,13 +162,23 @@ final class ZplBuilder
         $showText = TypeCaster::bool($element['showText'] ?? true, true) ? 'Y' : 'N';
         $barcodeType = TypeCaster::string($element['barcodeType'] ?? 'code128', 'code128');
 
+        // La riga leggibile sotto il codice usa il font attivo nel campo:
+        // senza impostarlo esce con quello predefinito della stampante, che e'
+        // minuscolo. Si emette solo se qualcuno ha chiesto una dimensione,
+        // per non cambiare l'aspetto delle etichette gia' in uso.
+        $textHeight = TypeCaster::int($element['textHeight'] ?? 0, 0);
+        $font = $textHeight > 0
+            ? sprintf('^A0N,%d,%d', $textHeight, (int) round($textHeight * 0.6))
+            : '';
+
         $data = $this->escapeFieldData($value);
 
         if ($barcodeType === 'code39') {
             return sprintf(
-                '^FO%d,%d^BY%d^B3N,N,%d,%s,N^FD%s^FS',
+                '^FO%d,%d%s^BY%d^B3N,N,%d,%s,N^FD%s^FS',
                 $x,
                 $y,
+                $font,
                 $moduleWidth,
                 $height,
                 $showText,
@@ -177,9 +187,10 @@ final class ZplBuilder
         }
 
         return sprintf(
-            '^FO%d,%d^BY%d^BCN,%d,%s,N,N^FD%s^FS',
+            '^FO%d,%d%s^BY%d^BCN,%d,%s,N,N^FD%s^FS',
             $x,
             $y,
+            $font,
             $moduleWidth,
             $height,
             $showText,

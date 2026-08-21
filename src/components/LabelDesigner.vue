@@ -1270,6 +1270,18 @@ function buildApiExample() {
               </select>
             </label>
             <label>
+              Dimensione testo sotto il codice
+              <input
+                :value="selectedElement.textHeight ?? 0"
+                type="number"
+                min="0"
+                max="200"
+                step="1"
+                @input="selectedElement.textHeight = Math.max(0, Math.round(Number($event.target.value) || 0))"
+              />
+              <small class="hint">0 lascia il carattere predefinito della stampante, che è molto piccolo.</small>
+            </label>
+            <label>
               Altezza
               <input v-model.number="selectedElement.height" type="number" min="20" />
             </label>
