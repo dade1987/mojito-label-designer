@@ -81,6 +81,54 @@ describe('layoutStorage', () => {
     expect(saved.printSpeed).toBe(0)
   })
 
+
+  it('round-trip completo: ogni proprietà sopravvive a salvataggio e ricarica', () => {
+    // OGNI proprietà che il designer sa impostare: se una chiave si perde
+    // qui, l'utente la reimposta a mano senza capire perché.
+    const fullFat = {
+      id: 'full-fat',
+      name: 'Etichetta completa',
+      labelWidth: 944,
+      labelHeight: 354,
+      dpi: 600,
+      originX: 24,
+      originY: 8,
+      mediaTracking: 'mark',
+      darkness: 22,
+      printSpeed: 3,
+      dataSources: [
+        { name: 'codice_lotto_interno', label: 'Codice lotto interno', defaultValue: 'CHL134BCL20S08261' },
+        { name: 'numero', label: 'Numero', defaultValue: '999' },
+      ],
+      elements: [
+        {
+          id: 'testo', type: 'text', x: 10, y: 20, font: '0',
+          fontHeight: 150, fontWidth: 140, rotation: 270,
+          bold: true, underline: true, prefix: 'N. ', suffix: ' /fine',
+          dataSource: 'numero', staticValue: 'statico', defaultValue: 'default',
+        },
+        {
+          id: 'codice', type: 'barcode', x: 30, y: 40, barcodeType: 'code39',
+          moduleWidth: 3, height: 200, showText: false, textHeight: 40,
+          rotation: 90, dataSource: 'codice_lotto_interno',
+        },
+        {
+          id: 'qr', type: 'qr', x: 50, y: 60, magnification: 7,
+          errorCorrection: 'H', rotation: 180, dataSource: 'codice_lotto_interno',
+        },
+        {
+          id: 'logo', type: 'image', x: 70, y: 80, width: 340, height: 120,
+          threshold: 90, rotation: 90, imageData: 'data:image/png;base64,AAAA',
+        },
+      ],
+    }
+
+    saveLocalLayout(fullFat)
+    const reloaded = loadLocalLayout('full-fat')
+
+    expect(reloaded).toEqual(fullFat)
+  })
+
   it('save/load/delete local layout', () => {
     const saved = saveLocalLayout({ id: 'a', name: 'A', elements: [], dataSources: [] })
     expect(saved.id).toBe('a')

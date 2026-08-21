@@ -130,6 +130,14 @@ final class TemplateRepository
             'labelWidth' => TypeCaster::int($template['labelWidth'] ?? 600, 600),
             'labelHeight' => TypeCaster::int($template['labelHeight'] ?? 400, 400),
             'dpi' => TypeCaster::int($template['dpi'] ?? 203, 203),
+            // Tutto cio' che il designer salva deve tornare indietro uguale:
+            // queste proprieta' venivano scartate e "Salva server" perdeva
+            // offset origine, avanzamento carta, intensita' e velocita'.
+            'originX' => TypeCaster::int($template['originX'] ?? 0, 0),
+            'originY' => TypeCaster::int($template['originY'] ?? 0, 0),
+            'mediaTracking' => TypeCaster::string($template['mediaTracking'] ?? 'gap', 'gap'),
+            'darkness' => TypeCaster::int($template['darkness'] ?? 0, 0),
+            'printSpeed' => TypeCaster::int($template['printSpeed'] ?? 0, 0),
             'dataSources' => array_map(static function (mixed $source): array {
                 if (! is_array($source)) {
                     throw new InvalidArgumentException('Ogni data source deve essere un oggetto.');

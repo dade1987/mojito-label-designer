@@ -549,25 +549,29 @@ function removeSelected() {
   showStatus('Elemento/i eliminato/i', 'info')
 }
 
-function rememberDataSourceName(source) {
-  source._renamePrevious = source.name
-}
-
-function handleDataSourceNameBlur(source) {
+function handleDataSourceRename(source, requestedName, event) {
   if (!template.value) return
 
-  const previousName = source._renamePrevious ?? source.name
-  const result = renameDataSource(template.value, previousName, source.name)
+  // Il campo NON usa v-model: se il nome mutasse a ogni tasto, al momento
+  // della conferma la sorgente col "vecchio" nome non esisterebbe piu' e la
+  // rinomina fallirebbe in silenzio lasciando gli elementi legati al nome
+  // vecchio (e al ricaricamento la rinomina spariva).
+  const result = renameDataSource(template.value, source.name, requestedName)
 
   if (!result.ok) {
+    if (event?.target) {
+      event.target.value = source.name
+    }
+
     if (result.reason === 'duplicate') {
-      source.name = previousName
       showStatus('Nome già usato da un altro data source.', 'error')
+    } else if (String(requestedName ?? '').trim() !== source.name) {
+      showStatus('Nome non valido.', 'error')
     }
     return
   }
 
-  delete source._renamePrevious
+  showStatus(`Data source rinominato in "${result.name}".`, 'success')
 }
 
 function handleKeydown(event) {
@@ -1135,9 +1139,12 @@ function buildApiExample() {
           </div>
         </div>
         <div class="data-sources">
+          <!-- Key per indice, NON per nome: se la key cambiasse col nome,
+               Vue ricreerebbe la riga durante la rinomina e il campo
+               perderebbe il focus a ogni tasto. -->
           <div
-            v-for="source in template.dataSources"
-            :key="source.name"
+            v-for="(source, sourceIndex) in template.dataSources"
+            :key="sourceIndex"
             class="data-row"
             :class="{ shared: countElementsUsingDataSource(template, source.name) > 1 }"
           >
@@ -1159,7 +1166,12 @@ function buildApiExample() {
                 ✕
               </button>
             </div>
-            <input v-model="source.name" type="text" placeholder="nome_variabile" @focus="rememberDataSourceName(source)" @blur="handleDataSourceNameBlur(source)" />
+            <input
+              :value="source.name"
+              type="text"
+              placeholder="nome_variabile"
+              @change="handleDataSourceRename(source, $event.target.value, $event)"
+            />
             <input v-model="source.defaultValue" type="text" placeholder="Valore di test" />
           </div>
           <button type="button" class="btn ghost" @click="addDataSource">+ Data source</button>
