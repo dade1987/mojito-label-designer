@@ -1198,6 +1198,19 @@ function buildApiExample() {
             <input v-model.number="selectedElement.y" type="number" min="0" />
           </label>
 
+          <label v-if="['text', 'barcode', 'qr'].includes(selectedElement.type)">
+            Rotazione
+            <select v-model.number="selectedElement.rotation">
+              <option :value="0">Nessuna</option>
+              <option :value="90">90° in senso orario</option>
+              <option :value="180">Capovolto</option>
+              <option :value="270">270°</option>
+            </select>
+            <small class="hint">
+              La stampante conosce solo questi quattro orientamenti. Le immagini non si ruotano.
+            </small>
+          </label>
+
           <template v-if="selectedElement.type === 'text'">
             <div v-if="selectedElementSharesDataSource" class="shared-element-warning">
               <p>
@@ -1261,16 +1274,6 @@ function buildApiExample() {
                   {{ source.name }}
                 </option>
               </select>
-            </label>
-            <label>
-              Rotazione
-              <select v-model.number="selectedElement.rotation">
-                <option :value="0">Nessuna</option>
-                <option :value="90">90° in senso orario</option>
-                <option :value="180">Capovolto</option>
-                <option :value="270">270°</option>
-              </select>
-              <small class="hint">La stampante conosce solo questi quattro orientamenti.</small>
             </label>
             <label>
               Tipo
