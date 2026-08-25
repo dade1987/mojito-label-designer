@@ -41,10 +41,24 @@ for (const entry of await readdir(phpTargetDir)) {
 await cp(phpSourceDir, phpTargetDir, { recursive: true })
 console.log(`Mojito PHP deploy: ${phpSourceDir} -> ${phpTargetDir}`)
 
-const psSource = path.join(rootDir, 'server', 'bin', 'print-raw.ps1')
 const psTargetDir = path.join(greenEnergyRoot, 'lib', 'mojito-label', 'bin')
 await mkdir(psTargetDir, { recursive: true })
-await cp(psSource, path.join(psTargetDir, 'print-raw.ps1'))
-console.log(`Mojito PS1 deploy: ${psSource} -> ${psTargetDir}`)
+
+// print-raw.ps1 manda lo ZPL in RAW, print-image.ps1 stampa l'etichetta gia'
+// disegnata: senza il secondo, sulle stampanti non ZPL non esce niente.
+for (const script of ['print-raw.ps1', 'print-image.ps1']) {
+  const psSource = path.join(rootDir, 'server', 'bin', script)
+  await cp(psSource, path.join(psTargetDir, script))
+  console.log(`Mojito PS1 deploy: ${psSource} -> ${psTargetDir}`)
+}
+
+// Il font con cui viene disegnato il testo nella stampa grafica: senza, il
+// server ripiega sui font di sistema e le etichette cambiano faccia da una
+// macchina all'altra.
+const fontsSource = path.join(rootDir, 'server', 'resources', 'fonts')
+const fontsTargetDir = path.join(greenEnergyRoot, 'lib', 'mojito-label', 'resources', 'fonts')
+await mkdir(fontsTargetDir, { recursive: true })
+await cp(fontsSource, fontsTargetDir, { recursive: true })
+console.log(`Mojito font deploy: ${fontsSource} -> ${fontsTargetDir}`)
 
 console.log('Deploy completato. Su GreenEnergyServer esegui: composer dump-autoload -o')

@@ -40,6 +40,8 @@ Il risultato: chiunque in reparto disegna un'etichetta in 2 minuti, la salva sul
 - 💾 **3 modi per salvare** — file `.mojito.json`, server, o `localStorage`
 - 🔌 **API REST** — anteprima ZPL e stampa da qualsiasi sistema esterno
 - 🖨️ **Stampa RAW** — CUPS `lp -o raw` su Linux, spooling raw su Windows
+- 🖨️ **Anche senza ZPL** — per le stampanti che lo ZPL non lo parlano (es. Munbyn ITPP941P) il server disegna l'etichetta e la manda alla coda di stampa di sistema come immagine, col driver installato
+- 🔢 **Stampa a serie** — quantità e intervallo di numeri di serie (prefisso, passo, zeri davanti) in una sola stampata
 - 🖥️ **Desktop opzionale** — shell Electron con dialog di file nativi
 - ✅ **Qualità industriale** — analisi statica al massimo livello, test unitari front+back, mutation testing
 
@@ -103,7 +105,17 @@ printf '^XA^FO50,50^ADN,36,20^FDTEST^FS^XZ' | lp -d ZPL_Printer -o raw
 | POST | `/api/templates` | Salva un layout |
 | DELETE | `/api/templates/{id}` | Elimina un layout |
 | POST | `/api/zpl/preview` | Genera ZPL da template + dati |
-| POST | `/api/print` | Stampa etichetta |
+| POST | `/api/label/preview` | Etichetta disegnata (PNG base64), come esce dalla stampa non‑ZPL |
+| POST | `/api/print` | Stampa etichetta (`copies`, `jobs`, `printMode`) |
+
+**Stampare una serie di etichette numerate (stampa non‑ZPL):**
+
+```bash
+curl -X POST http://localhost:8080/api/print \
+  -H 'Content-Type: application/json' \
+  -d '{"templateId":"pacco","printer":"Munbyn_ITPP941P","printMode":"graphic","copies":1,
+       "jobs":[{"serial":"CHL12251"},{"serial":"CHL12252"},{"serial":"CHL12253"}]}'
+```
 
 **Stampare un layout salvato passando solo i dati variabili:**
 

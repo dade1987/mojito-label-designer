@@ -261,4 +261,49 @@ final class TemplateRepositoryTest extends TestCase
             $this->assertSame($value, $reloaded[$key] ?? null, "Proprieta' template persa o alterata: {$key}");
         }
     }
+
+    public function test_it_remembers_how_the_layout_must_be_printed(): void
+    {
+        $repository = new TemplateRepository($this->tempDir);
+
+        $saved = $repository->save([
+            'id' => 'grafica',
+            'name' => 'Grafica',
+            'printMode' => 'graphic',
+            'dataSources' => [],
+            'elements' => [],
+        ]);
+
+        $this->assertSame('graphic', $saved['printMode']);
+        $this->assertSame('graphic', $repository->find('grafica')['printMode']);
+    }
+
+    public function test_a_layout_without_a_print_mode_stays_on_zpl(): void
+    {
+        $repository = new TemplateRepository($this->tempDir);
+
+        $saved = $repository->save([
+            'id' => 'classica',
+            'name' => 'Classica',
+            'dataSources' => [],
+            'elements' => [],
+        ]);
+
+        $this->assertSame('zpl', $saved['printMode']);
+    }
+
+    public function test_an_unknown_print_mode_is_not_stored(): void
+    {
+        $repository = new TemplateRepository($this->tempDir);
+
+        $saved = $repository->save([
+            'id' => 'strana',
+            'name' => 'Strana',
+            'printMode' => 'olografica',
+            'dataSources' => [],
+            'elements' => [],
+        ]);
+
+        $this->assertSame('zpl', $saved['printMode']);
+    }
 }

@@ -4,7 +4,9 @@
     "type": "project",
     "license": "MIT",
     "require": {
-        "php": "^8.2"
+        "php": "^8.2",
+        "picqer/php-barcode-generator": "^3.2",
+        "chillerlan/php-qrcode": "^5.0"
     },
     "require-dev": {
         "infection/infection": "^0.32",

@@ -59,6 +59,7 @@ final class ApiHandler
                 $method === 'POST' && $path === '/api/templates' => $this->handleSaveTemplate($this->decodeBody($rawBody)),
                 $method === 'DELETE' && preg_match('#^/api/templates/([^/]+)$#', $path, $matches) === 1 => $this->handleDeleteTemplate($matches[1]),
                 $method === 'POST' && $path === '/api/zpl/preview' => $this->handlePreview($this->decodeBody($rawBody)),
+                $method === 'POST' && $path === '/api/label/preview' => $this->handleImagePreview($this->decodeBody($rawBody)),
                 $method === 'POST' && $path === '/api/print' => $this->handlePrint($this->decodeBody($rawBody)),
                 default => $this->error(404, 'Endpoint non trovato'),
             };
@@ -166,6 +167,32 @@ final class ApiHandler
     }
 
     /**
+     * L'anteprima di come verrà stampata l'etichetta sulle stampanti che non
+     * parlano ZPL: la stessa immagine che finirà nella coda di stampa.
+     *
+     * @param  array<string, mixed>  $body
+     * @return array{status: int, payload: array<string, mixed>}
+     */
+    private function handleImagePreview(array $body): array
+    {
+        $body = $this->resolvePrintPayload($body);
+        $png = $this->service->renderPng($body);
+        $media = LabelMedia::fromTemplate(
+            isset($body['template']) && is_array($body['template'])
+                ? TypeCaster::stringKeyedArray($body['template'])
+                : []
+        );
+
+        return $this->ok([
+            'png' => 'data:image/png;base64,'.base64_encode($png),
+            'width' => $media->widthDots(),
+            'height' => $media->heightDots(),
+            'widthMm' => round($media->widthMillimetres(), 1),
+            'heightMm' => round($media->heightMillimetres(), 1),
+        ]);
+    }
+
+    /**
      * @param  array<string, mixed>  $body
      * @return array{status: int, payload: array<string, mixed>}
      */
@@ -178,14 +205,36 @@ final class ApiHandler
             $this->service->setPrinterName($printer);
         }
 
+        $copies = max(1, TypeCaster::int($body['copies'] ?? 1, 1));
+        $jobs = $this->resolveJobs($body);
+        $total = count($jobs) * $copies;
+
+        if ($total > LabelPrinterService::MAX_COPIES) {
+            return $this->error(500, 'Stampa rifiutata: '.$total.' etichette superano il massimo di '.LabelPrinterService::MAX_COPIES.' per richiesta.');
+        }
+
         if (isset($body['zpl']) && is_string($body['zpl']) && $body['zpl'] !== '') {
-            $this->service->printZpl($body['zpl']);
+            for ($copy = 0; $copy < $copies; $copy++) {
+                $this->service->printZpl($body['zpl']);
+            }
+
+            $printed = $copies;
+            $mode = LabelPrinterService::MODE_ZPL;
         } else {
-            $this->service->printLabel($body);
+            $mode = $this->service->resolvePrintMode($body);
+            $printed = 0;
+
+            foreach ($jobs as $values) {
+                $this->service->printJob(['values' => $values] + $body, $copies);
+                $printed += $copies;
+            }
         }
 
         $payload = [
             'status' => 'printed',
+            'printed' => $printed,
+            'copies' => $copies,
+            'mode' => $mode,
             'printer' => $this->service->getPrinterName(),
             'method' => $this->service->getLastPrintMethod(),
         ];
@@ -195,6 +244,41 @@ final class ApiHandler
         }
 
         return $this->ok($payload);
+    }
+
+    /**
+     * Una stampa può valere per una etichetta sola o per una serie: `jobs` è
+     * l'elenco dei valori che cambiano da un'etichetta all'altra (i numeri di
+     * serie), sopra ai valori comuni di `values`.
+     *
+     * @param  array<string, mixed>  $body
+     * @return list<array<string, mixed>>
+     */
+    private function resolveJobs(array $body): array
+    {
+        $shared = isset($body['values']) && is_array($body['values'])
+            ? TypeCaster::stringKeyedArray($body['values'])
+            : [];
+
+        if (! isset($body['jobs'])) {
+            return [$shared];
+        }
+
+        if (! is_array($body['jobs']) || $body['jobs'] === []) {
+            throw new InvalidArgumentException('Il campo jobs deve essere un elenco non vuoto di valori per etichetta.');
+        }
+
+        $jobs = [];
+
+        foreach ($body['jobs'] as $job) {
+            if (! is_array($job)) {
+                throw new InvalidArgumentException('Il campo jobs deve contenere solo insiemi di valori.');
+            }
+
+            $jobs[] = TypeCaster::stringKeyedArray($job) + $shared;
+        }
+
+        return $jobs;
     }
 
     /**

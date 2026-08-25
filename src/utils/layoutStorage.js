@@ -25,6 +25,9 @@ export function sanitizeTemplateForSave(template) {
     // Senza questi tre, "Salva" buttava via l'avanzamento carta, l'intensità
     // e la velocità: alla riapertura del layout la stampa tornava diversa.
     mediaTracking: plain.mediaTracking ?? 'gap',
+    // Come va stampato questo layout: comandi ZPL, oppure disegnato e mandato
+    // alla coda di sistema per le stampanti che lo ZPL non lo parlano.
+    printMode: plain.printMode === 'graphic' ? 'graphic' : 'zpl',
     darkness: plain.darkness ?? 0,
     printSpeed: plain.printSpeed ?? 0,
     originX: plain.originX ?? 0,

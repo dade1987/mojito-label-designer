@@ -83,6 +83,14 @@ export function previewZpl(body) {
   })
 }
 
+/** L'etichetta disegnata come uscirà dalle stampanti non ZPL. */
+export function previewLabelImage(body) {
+  return request('/api/label/preview', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
 export function printLabel(body) {
   return request('/api/print', {
     method: 'POST',

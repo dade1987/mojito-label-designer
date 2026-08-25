@@ -4,7 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-Mojito is a ZPL label designer for thermal label printers (drag-and-drop UI): position text, barcode (with named data sources), and image elements on a label, preview the generated ZPL, and print via CUPS (`lp -o raw`) or Windows raw printing.
+Mojito is a label designer for thermal label printers (drag-and-drop UI): position text, barcode (with named data sources), and image elements on a label, preview the generated ZPL, and print it.
+
+A label can be printed two ways, chosen per template (`printMode`):
+- **`zpl`** (default, unchanged): ZPL commands sent RAW — CUPS `lp -o raw` / Windows raw spooling.
+- **`graphic`**: the server *draws* the label into a PNG (`LabelRasterRenderer`, GD) and sends it to the system print queue with the installed driver — CUPS `lp` with a custom media size / Windows `print-image.ps1` (`System.Drawing.Printing`). This is the path for printers that don't speak ZPL (e.g. Munbyn ITPP941P).
 
 It is a standalone project (own git repo) but **deploys into** the `GreenEnergyServer` Laravel app as a station app — see "Deploy" below. `GreenEnergyServer` lives as a sibling directory (`../GreenEnergyServer`) when both repos are checked out side by side.
 
@@ -75,13 +79,17 @@ Key classes in `server/src/`:
 - `ApiHandler` — HTTP routing/dispatch, one method per endpoint.
 - `TemplateRepository` — reads/writes `storage/templates/{id}.json`.
 - `ZplBuilder` — turns a template + values into a ZPL string (text, barcode, image commands).
+- `LabelRasterRenderer` — the same template + values drawn into a PNG, 1 px per printer dot, for `printMode: graphic`. Barcodes come from `picqer/php-barcode-generator`, QR from `chillerlan/php-qrcode`, text from the TTF found by `LabelFont` (Liberation Sans Narrow is bundled in `server/resources/fonts/`).
+- `LabelMedia` — label size in dots → paper size in mm (`Custom.76x51mm` for CUPS, hundredths of an inch for Windows).
 - `ZplImageConverter` — converts raster images to ZPL `^GFA` ASCII-hex format.
 - `LabelPrinterService` — orchestrates build + print, tracks last print method/output for diagnostics (`MOJITO_PRINTER_DEBUG` env var exposes raw print output over the API).
-- `PrinterPlatform` — OS detection and printer discovery/printing, branches Linux (CUPS `lp -o raw`) vs Windows (raw spooling, with Laragon-specific temp-dir fallbacks — see recent `fix(print):` commits for the fragile edge cases here).
+- `PrinterPlatform` — OS detection and printer discovery/printing, branches Linux (CUPS `lp -o raw`) vs Windows (raw spooling, with Laragon-specific temp-dir fallbacks — see recent `fix(print):` commits for the fragile edge cases here). `buildGraphicPrintCommands()` is the non-ZPL twin: no `-o raw`, media size declared.
 - `ShellCommandRunner` — thin wrapper around shell exec, isolated so it's mockable in tests.
 - `TypeCaster` — defensive casting for decoded JSON request bodies (everything from `json_decode` is `mixed`).
 
-When printing, the request either carries a `templateId` (server resolves it via `TemplateRepository`), an inline `template`, or a raw pre-built `zpl` string.
+When printing, the request either carries a `templateId` (server resolves it via `TemplateRepository`), an inline `template`, or a raw pre-built `zpl` string. `POST /api/print` also accepts `copies` (repeat the same label) and `jobs` (a list of per-label value maps — one label per entry, used by the designer's manual serial-range printing); `POST /api/label/preview` returns the drawn label as a base64 PNG. The whole run is capped at `LabelPrinterService::MAX_COPIES` labels.
+
+Serial ranges live in `src/utils/serialRange.js` (pure, 100% covered): `buildSerialRange({prefix, start, end, step, pad, suffix})` produces the numbers, `buildPrintJobs()` turns them into the `jobs` payload.
 
 ### Frontend/backend integration when embedded in GreenEnergyServer
 

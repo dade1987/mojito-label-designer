@@ -60,6 +60,62 @@ final class PrinterPlatform
         return ['lp -d '.escapeshellarg($printerName).' -o raw '.escapeshellarg($filePath)];
     }
 
+    /**
+     * I comandi per stampare un'etichetta già disegnata (PNG).
+     *
+     * È la strada delle stampanti che non parlano ZPL: qui non si manda un
+     * programma alla stampante, si manda un'immagine alla coda di sistema, che
+     * la converte col driver installato.
+     *
+     * @return list<string>
+     */
+    public static function buildGraphicPrintCommands(string $printerName, string $filePath, LabelMedia $media, string $tempDir = ''): array
+    {
+        if (self::isWindows()) {
+            return self::buildWindowsGraphicPrintCommands($printerName, $filePath, $media, $tempDir);
+        }
+
+        return [self::buildUnixGraphicPrintCommand($printerName, $filePath, $media)];
+    }
+
+    public static function buildUnixGraphicPrintCommand(string $printerName, string $filePath, LabelMedia $media): string
+    {
+        // Niente "-o raw": quello manderebbe alla stampante i byte del PNG.
+        // Il formato carta va dichiarato, altrimenti CUPS assume A4 e stampa
+        // l'etichetta grande come un francobollo in cima al foglio.
+        return 'lp -d '.escapeshellarg($printerName)
+            .' -o '.escapeshellarg('media='.$media->cupsMediaName())
+            .' -o fit-to-page'
+            .' -o orientation-requested=3'
+            .' '.escapeshellarg($filePath);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function buildWindowsGraphicPrintCommands(string $printerName, string $filePath, LabelMedia $media, string $tempDir = ''): array
+    {
+        $powershell = self::windowsPowerShellExecutable();
+        $script = self::windowsImagePrintScriptPath();
+        $workTemp = $tempDir !== '' ? $tempDir : self::writableTempDir(dirname($filePath));
+
+        return [
+            escapeshellarg($powershell)
+                .' -NoProfile -NonInteractive -ExecutionPolicy Bypass -File '
+                .escapeshellarg($script)
+                .' -PrinterName '.escapeshellarg($printerName)
+                .' -FilePath '.escapeshellarg($filePath)
+                .' -WidthMm '.escapeshellarg(number_format($media->widthMillimetres(), 2, '.', ''))
+                .' -HeightMm '.escapeshellarg(number_format($media->heightMillimetres(), 2, '.', ''))
+                .' -TempDir '.escapeshellarg($workTemp),
+        ];
+    }
+
+    public static function windowsImagePrintScriptPath(): string
+    {
+        return dirname(__DIR__).'/bin/print-image.ps1';
+    }
+
     public static function writableTempDir(string $preferred = ''): string
     {
         $laragonRoot = getenv('LARAGON_ROOT');

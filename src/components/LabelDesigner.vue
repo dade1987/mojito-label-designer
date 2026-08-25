@@ -5,6 +5,7 @@ import {
   fetchPrinters,
   fetchTemplate,
   fetchTemplates,
+  previewLabelImage,
   previewZpl,
   printLabel,
   saveTemplate,
@@ -30,6 +31,13 @@ import { cloneTemplateState } from '../utils/cloneSerializable.js'
 import { hasWork, startNewLayout } from '../utils/newLayout.js'
 import { resolutionForPrinter, shouldWarnResolution } from '../utils/printerResolution.js'
 import { printableMagnification, resizeKeepingRatio } from '../utils/aspectRatio.js'
+import {
+  MAX_LABELS_PER_RUN,
+  buildPrintJobs,
+  buildSerialRange,
+  describeRun,
+  serialRangeCount,
+} from '../utils/serialRange.js'
 import {
   deleteLocalLayout,
   importLayoutFromFile,
@@ -71,6 +79,21 @@ const printerResolutions = ref({})
 const keepImageRatio = ref(true)
 const printerPlatform = ref('')
 const zplPreview = ref('')
+// L'etichetta disegnata: è quello che esce dalle stampanti non ZPL, e va
+// visto prima di stampare perché lì il risultato lo decide questo disegno.
+const labelImagePreview = ref('')
+// La stampa manuale a serie: una tirata di etichette numerate, senza dover
+// cambiare a mano il valore e ripremere Stampa per ogni pezzo.
+const batch = ref({
+  dataSource: '',
+  start: 1,
+  end: 10,
+  step: 1,
+  pad: 0,
+  prefix: '',
+  suffix: '',
+  copies: 1,
+})
 const statusMessage = ref('')
 const statusType = ref('info')
 const isBusy = ref(false)
@@ -695,6 +718,22 @@ async function refreshPreview() {
   } catch (error) {
     zplPreview.value = ''
   }
+
+  if (!isGraphicMode.value) {
+    labelImagePreview.value = ''
+
+    return
+  }
+
+  try {
+    const { png } = await previewLabelImage({
+      template: template.value,
+      values: dataValues.value,
+    })
+    labelImagePreview.value = png ?? ''
+  } catch (error) {
+    labelImagePreview.value = ''
+  }
 }
 
 async function handlePrint() {
@@ -707,9 +746,114 @@ async function handlePrint() {
     await printLabel({
       template: template.value,
       values: dataValues.value,
+      printMode: printMode.value,
       printer: selectedPrinter.value,
     })
     showStatus(`Etichetta inviata a ${selectedPrinter.value}`, 'success')
+  } catch (error) {
+    showStatus(error.message, 'error')
+  } finally {
+    isBusy.value = false
+  }
+}
+
+// Come va stampato questo layout. Lo ZPL resta la strada di casa; "graphic"
+// serve alle stampanti che lo ZPL non lo parlano (es. Munbyn ITPP941P): lì il
+// server disegna l'etichetta e la manda alla coda di stampa come immagine.
+const printMode = computed({
+  get: () => (template.value?.printMode === 'graphic' ? 'graphic' : 'zpl'),
+  set: (value) => {
+    if (template.value) {
+      template.value.printMode = value === 'graphic' ? 'graphic' : 'zpl'
+    }
+  },
+})
+
+const isGraphicMode = computed(() => printMode.value === 'graphic')
+
+const batchCopies = computed(() => Math.max(1, Number(batch.value.copies) || 1))
+
+const batchCount = computed(() => serialRangeCount(batch.value))
+
+const batchSummary = computed(() => describeRun(batchCount.value, batchCopies.value))
+
+/** I primi e l'ultimo numero di serie, per far vedere cosa uscirà davvero. */
+const batchSample = computed(() => {
+  try {
+    const serials = buildSerialRange(batch.value)
+
+    if (serials.length <= 4) {
+      return serials.join(', ')
+    }
+
+    return `${serials.slice(0, 3).join(', ')} … ${serials[serials.length - 1]}`
+  } catch {
+    return ''
+  }
+})
+
+/**
+ * La sorgente dati che riceve il numero di serie: si sceglie da sola quella
+ * che ne ha l'aria, così la stampa a serie è pronta appena si apre il layout.
+ */
+function pickBatchDataSource(sources) {
+  const names = (sources ?? []).map((source) => source.name)
+
+  if (names.includes(batch.value.dataSource)) {
+    return batch.value.dataSource
+  }
+
+  const likely = names.find((name) =>
+    /seri|numero|progressiv|pack|pacco|barcode|codice/i.test(name),
+  )
+
+  return likely ?? names[0] ?? ''
+}
+
+watch(
+  () => template.value?.dataSources,
+  (sources) => {
+    batch.value.dataSource = pickBatchDataSource(sources)
+  },
+  { deep: true, immediate: true },
+)
+
+const canPrintBatch = computed(
+  () =>
+    !isBusy.value &&
+    Boolean(selectedPrinter.value.trim()) &&
+    Boolean(batch.value.dataSource) &&
+    batchCount.value > 0 &&
+    batchCount.value <= MAX_LABELS_PER_RUN,
+)
+
+/**
+ * Stampa una serie di etichette numerate in una sola richiesta: il server
+ * ripete il layout cambiando ogni volta il numero di serie.
+ */
+async function handleBatchPrint() {
+  if (!template.value) return
+
+  isBusy.value = true
+
+  try {
+    ensurePrinterSelected()
+    const serials = buildSerialRange(batch.value)
+    const jobs = buildPrintJobs(serials, batch.value.dataSource)
+
+    await printLabel({
+      template: template.value,
+      values: dataValues.value,
+      jobs,
+      copies: batchCopies.value,
+      printMode: printMode.value,
+      printer: selectedPrinter.value,
+    })
+
+    showStatus(
+      `Serie inviata a ${selectedPrinter.value}: ${describeRun(serials.length, batchCopies.value)}`,
+      'success',
+    )
   } catch (error) {
     showStatus(error.message, 'error')
   } finally {
@@ -1444,6 +1588,19 @@ function buildApiExample() {
           </select>
         </label>
         <label>
+          Come stampare
+          <select v-model="printMode">
+            <option value="zpl">Comandi ZPL (Zebra, Citizen, compatibili)</option>
+            <option value="graphic">Stampa normale di sistema (immagine)</option>
+          </select>
+          <small class="hint">
+            Non tutte le stampanti parlano ZPL. Con "stampa normale" il server
+            disegna l'etichetta e la manda alla coda di stampa come immagine,
+            usando il driver installato: è la strada per stampanti come la
+            Munbyn ITPP941P.
+          </small>
+        </label>
+        <label>
           Avanzamento carta
           <select v-model="mediaTracking">
             <option value="gap">Etichette con spazio (gap)</option>
@@ -1527,6 +1684,70 @@ function buildApiExample() {
           Se la stampa esce tagliata sul bordo sinistro/alto, aumenta l'offset
           per spostare tutto il contenuto (es. 24 dots ≈ 2 mm a 300 dpi).
         </p>
+        </div>
+
+        <h2>Stampa manuale</h2>
+        <div class="batch-panel">
+          <label>
+            Numero di serie nel campo
+            <select v-model="batch.dataSource">
+              <option v-for="source in template.dataSources" :key="source.name" :value="source.name">
+                {{ source.label ?? source.name }}
+              </option>
+            </select>
+          </label>
+          <div class="inline-fields">
+            <label>
+              Da
+              <input v-model.number="batch.start" type="number" min="0" step="1" />
+            </label>
+            <label>
+              A
+              <input v-model.number="batch.end" type="number" min="0" step="1" />
+            </label>
+          </div>
+          <div class="inline-fields">
+            <label>
+              Passo
+              <input v-model.number="batch.step" type="number" min="1" step="1" />
+            </label>
+            <label>
+              Cifre (zeri davanti)
+              <input v-model.number="batch.pad" type="number" min="0" max="12" step="1" />
+            </label>
+          </div>
+          <div class="inline-fields">
+            <label>
+              Prefisso
+              <input v-model="batch.prefix" type="text" placeholder="es. CHL1225" />
+            </label>
+            <label>
+              Suffisso
+              <input v-model="batch.suffix" type="text" />
+            </label>
+          </div>
+          <label>
+            Copie per etichetta
+            <input v-model.number="batch.copies" type="number" min="1" max="100" step="1" />
+          </label>
+
+          <p class="hint">
+            <strong>{{ batchSummary }}</strong>
+            <template v-if="batchSample"><br />{{ batchSample }}</template>
+          </p>
+          <p v-if="batchCount > MAX_LABELS_PER_RUN" class="hint warn-box">
+            Troppe etichette in una volta: il massimo è {{ MAX_LABELS_PER_RUN }}.
+          </p>
+
+          <button type="button" class="btn primary" :disabled="!canPrintBatch" @click="handleBatchPrint">
+            Stampa serie
+          </button>
+        </div>
+
+        <div v-if="isGraphicMode" class="batch-panel">
+          <p class="devtools-label">Anteprima di stampa</p>
+          <img v-if="labelImagePreview" class="label-image-preview" :src="labelImagePreview" alt="Anteprima etichetta" />
+          <p v-else class="hint">Anteprima non disponibile: controlla il layout e la stampante.</p>
         </div>
 
         <details class="devtools-panel">
@@ -2024,6 +2245,31 @@ function buildApiExample() {
 .hint {
   color: #888;
   font-size: 0.9rem;
+}
+
+.inline-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.batch-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  background: #fafafa;
+}
+
+.label-image-preview {
+  width: 100%;
+  height: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  image-rendering: pixelated;
 }
 
 .devtools-panel {

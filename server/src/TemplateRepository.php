@@ -138,6 +138,12 @@ final class TemplateRepository
             'mediaTracking' => TypeCaster::string($template['mediaTracking'] ?? 'gap', 'gap'),
             'darkness' => TypeCaster::int($template['darkness'] ?? 0, 0),
             'printSpeed' => TypeCaster::int($template['printSpeed'] ?? 0, 0),
+            // Come va stampato: comandi ZPL (il default di sempre) oppure
+            // disegnato e mandato alla coda di sistema, per le stampanti che
+            // lo ZPL non lo parlano.
+            'printMode' => TypeCaster::string($template['printMode'] ?? LabelPrinterService::MODE_ZPL, LabelPrinterService::MODE_ZPL) === LabelPrinterService::MODE_GRAPHIC
+                ? LabelPrinterService::MODE_GRAPHIC
+                : LabelPrinterService::MODE_ZPL,
             'dataSources' => array_map(static function (mixed $source): array {
                 if (! is_array($source)) {
                     throw new InvalidArgumentException('Ogni data source deve essere un oggetto.');

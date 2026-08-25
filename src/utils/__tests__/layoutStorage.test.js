@@ -63,6 +63,7 @@ describe('layoutStorage', () => {
       name: 'Stampa',
       mediaTracking: 'continuous',
       darkness: 22,
+      printMode: 'graphic',
       printSpeed: 3,
       dataSources: [],
       elements: [],
@@ -70,6 +71,7 @@ describe('layoutStorage', () => {
 
     expect(saved.mediaTracking).toBe('continuous')
     expect(saved.darkness).toBe(22)
+    expect(saved.printMode).toBe('graphic')
     expect(saved.printSpeed).toBe(3)
   })
 
@@ -78,6 +80,8 @@ describe('layoutStorage', () => {
 
     expect(saved.mediaTracking).toBe('gap')
     expect(saved.darkness).toBe(0)
+    // Chi non ha scelto niente continua a stampare in ZPL, come prima.
+    expect(saved.printMode).toBe('zpl')
     expect(saved.printSpeed).toBe(0)
   })
 
@@ -96,6 +100,7 @@ describe('layoutStorage', () => {
       mediaTracking: 'mark',
       darkness: 22,
       printSpeed: 3,
+      printMode: 'graphic',
       dataSources: [
         { name: 'codice_lotto_interno', label: 'Codice lotto interno', defaultValue: 'CHL134BCL20S08261' },
         { name: 'numero', label: 'Numero', defaultValue: '999' },

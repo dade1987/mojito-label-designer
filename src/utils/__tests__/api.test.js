@@ -5,6 +5,7 @@ import {
   fetchPrinters,
   fetchTemplate,
   fetchTemplates,
+  previewLabelImage,
   previewZpl,
   printLabel,
   saveTemplate,
@@ -70,5 +71,18 @@ describe('api', () => {
     })
 
     await expect(fetchPrinters()).rejects.toThrow('Errore HTTP 502')
+  })
+
+  it('previewLabelImage chiede il disegno dell\'etichetta', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ png: 'data:image/png;base64,AAA', width: 400, height: 200 }),
+    })
+
+    const result = await previewLabelImage({ template: { labelWidth: 400 }, values: {} })
+
+    expect(result.png).toContain('data:image/png;base64,')
+    expect(fetchSpy.mock.calls[0][0]).toContain('/api/label/preview')
+    expect(fetchSpy.mock.calls[0][1].method).toBe('POST')
   })
 })
