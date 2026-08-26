@@ -240,15 +240,29 @@ final class LabelPrinterService
     }
 
     /**
-     * La strada di stampa chiesta: quella della richiesta, se non c'è quella
-     * del layout, altrimenti ZPL come è sempre stato.
+     * La strada di stampa: quella chiesta dalla richiesta, se non c'è quella
+     * che impone la stampante, poi quella del layout, infine ZPL come è
+     * sempre stato.
+     *
+     * La stampante viene prima del layout perché è un fatto, non una
+     * preferenza: un layout salvato mesi fa su una Citizen, mandato tale e
+     * quale a una Munbyn, non darebbe errore — uscirebbe carta bianca. Chi
+     * vuole decidere lo dice nella richiesta (è quello che fa il designer
+     * quando si forza la modalità a mano).
      *
      * @param  array<string, mixed>  $data
      */
     public function resolvePrintMode(array $data): string
     {
         $template = $this->templateOf($data);
-        $mode = TypeCaster::string($data['printMode'] ?? $template['printMode'] ?? self::MODE_ZPL, self::MODE_ZPL);
+
+        $mode = TypeCaster::string(
+            $data['printMode']
+                ?? PrinterPrintMode::forPrinter($this->printerName)
+                ?? $template['printMode']
+                ?? self::MODE_ZPL,
+            self::MODE_ZPL
+        );
 
         return strtolower(trim($mode)) === self::MODE_GRAPHIC ? self::MODE_GRAPHIC : self::MODE_ZPL;
     }

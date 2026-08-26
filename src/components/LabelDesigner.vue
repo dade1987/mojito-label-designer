@@ -1239,6 +1239,66 @@ function buildApiExample() {
     <main v-if="template" class="workspace">
       <aside class="panel left">
         <div class="panel-scroll">
+        <details class="section" :open="sections.batch" @toggle="toggleSection('batch', $event)">
+        <summary>Stampa manuale</summary>
+        <div class="batch-panel">
+          <label>
+            Numero di serie nel campo
+            <select v-model="batch.dataSource">
+              <option v-for="source in template.dataSources" :key="source.name" :value="source.name">
+                {{ source.label ?? source.name }}
+              </option>
+            </select>
+          </label>
+          <div class="inline-fields">
+            <label>
+              Da
+              <input v-model.number="batch.start" type="number" min="0" step="1" />
+            </label>
+            <label>
+              A
+              <input v-model.number="batch.end" type="number" min="0" step="1" />
+            </label>
+          </div>
+          <div class="inline-fields">
+            <label>
+              Passo
+              <input v-model.number="batch.step" type="number" min="1" step="1" />
+            </label>
+            <label>
+              Cifre (zeri davanti)
+              <input v-model.number="batch.pad" type="number" min="0" max="12" step="1" />
+            </label>
+          </div>
+          <div class="inline-fields">
+            <label>
+              Prefisso
+              <input v-model="batch.prefix" type="text" placeholder="es. CHL1225" />
+            </label>
+            <label>
+              Suffisso
+              <input v-model="batch.suffix" type="text" />
+            </label>
+          </div>
+          <label>
+            Copie per etichetta
+            <input v-model.number="batch.copies" type="number" min="1" max="100" step="1" />
+          </label>
+
+          <p class="hint">
+            <strong>{{ batchSummary }}</strong>
+            <template v-if="batchSample"><br />{{ batchSample }}</template>
+          </p>
+          <p v-if="batchCount > MAX_LABELS_PER_RUN" class="hint warn-box">
+            Troppe etichette in una volta: il massimo è {{ MAX_LABELS_PER_RUN }}.
+          </p>
+
+          <button type="button" class="btn primary" :disabled="!canPrintBatch" @click="handleBatchPrint">
+            Stampa serie
+          </button>
+        </div>
+        </details>
+
         <details class="section" :open="sections.layout" @toggle="toggleSection('layout', $event)">
         <summary>Layout</summary>
         <label>
@@ -1286,96 +1346,6 @@ function buildApiExample() {
         </button>
         </details>
 
-        <details class="section" :open="sections.elements" @toggle="toggleSection('elements', $event)">
-        <summary>Elementi</summary>
-        <div class="palette">
-          <button type="button" @click="addElement('text')">+ Testo</button>
-          <button type="button" @click="addElement('barcode')">+ Barcode</button>
-          <button type="button" @click="addElement('qr')">+ QR</button>
-          <button type="button" @click="addElement('image')">+ Immagine</button>
-        </div>
-        </details>
-
-        <details class="section" :open="sections.dataSources" @toggle="toggleSection('dataSources', $event)">
-        <summary>Named Data Sources</summary>
-        <div v-if="sharedDataSources.length" class="shared-datasource-alert">
-          <strong>Data source condivisi</strong>
-          <p class="hint">
-            Lo stesso campo è collegato a più elementi: mostrano sempre lo stesso valore in stampa.
-          </p>
-          <div v-for="group in sharedDataSources" :key="group.name" class="shared-group">
-            <p class="shared-group-title">
-              <code>{{ group.name }}</code>
-              <span>· {{ group.elements.length }} elementi</span>
-            </p>
-            <ul class="shared-element-list">
-              <li v-for="element in group.elements" :key="element.id">
-                <span>{{ describeElementForUi(element) }}</span>
-                <span class="shared-element-actions">
-                  <button type="button" class="btn-link" @click="selectElementById(element.id)">
-                    Seleziona
-                  </button>
-                  <button type="button" class="btn-link warn" @click="handleDisconnectFromElement(element)">
-                    Scollega
-                  </button>
-                </span>
-              </li>
-            </ul>
-          </div>
-        </div>
-        <div class="data-sources">
-          <!-- Key per indice, NON per nome: se la key cambiasse col nome,
-               Vue ricreerebbe la riga durante la rinomina e il campo
-               perderebbe il focus a ogni tasto. -->
-          <div
-            v-for="(source, sourceIndex) in template.dataSources"
-            :key="sourceIndex"
-            class="data-row"
-            :class="{ shared: countElementsUsingDataSource(template, source.name) > 1 }"
-          >
-            <div class="data-row-header">
-              <input v-model="source.label" type="text" placeholder="Etichetta" />
-              <span
-                v-if="countElementsUsingDataSource(template, source.name) > 1"
-                class="usage-badge"
-                :title="`Usato da ${countElementsUsingDataSource(template, source.name)} elementi`"
-              >
-                ×{{ countElementsUsingDataSource(template, source.name) }}
-              </span>
-              <button
-                type="button"
-                class="icon-btn"
-                :title="countElementsUsingDataSource(template, source.name) > 0 ? 'In uso: elimina prima gli elementi sul canvas' : 'Elimina data source'"
-                @click="handleRemoveDataSource(source.name)"
-              >
-                ✕
-              </button>
-            </div>
-            <input
-              :value="source.name"
-              type="text"
-              placeholder="nome_variabile"
-              @change="handleDataSourceRename(source, $event.target.value, $event)"
-            />
-            <input v-model="source.defaultValue" type="text" placeholder="Valore di test" />
-          </div>
-          <button type="button" class="btn ghost" @click="addDataSource">+ Data source</button>
-        </div>
-        </details>
-        </div>
-      </aside>
-
-      <section class="canvas-area">
-        <LabelCanvas
-          v-model:template="template"
-          v-model:selected-ids="selectedIds"
-          :data-values="dataValues"
-          @update-text-value="handleUpdateTextValue"
-        />
-      </section>
-
-      <aside class="panel right">
-        <div class="panel-scroll">
         <details class="section" :open="sections.properties" @toggle="toggleSection('properties', $event)">
         <summary>Proprietà</summary>
         <div v-if="selectedCount > 1" class="properties">
@@ -1621,6 +1591,83 @@ function buildApiExample() {
         <p v-else class="hint">Seleziona uno o più elementi sul canvas · Ctrl+C/V/D</p>
         </details>
 
+        <details class="section" :open="sections.elements" @toggle="toggleSection('elements', $event)">
+        <summary>Elementi</summary>
+        <div class="palette">
+          <button type="button" @click="addElement('text')">+ Testo</button>
+          <button type="button" @click="addElement('barcode')">+ Barcode</button>
+          <button type="button" @click="addElement('qr')">+ QR</button>
+          <button type="button" @click="addElement('image')">+ Immagine</button>
+        </div>
+        </details>
+
+        <details class="section" :open="sections.dataSources" @toggle="toggleSection('dataSources', $event)">
+        <summary>Named Data Sources</summary>
+        <div v-if="sharedDataSources.length" class="shared-datasource-alert">
+          <strong>Data source condivisi</strong>
+          <p class="hint">
+            Lo stesso campo è collegato a più elementi: mostrano sempre lo stesso valore in stampa.
+          </p>
+          <div v-for="group in sharedDataSources" :key="group.name" class="shared-group">
+            <p class="shared-group-title">
+              <code>{{ group.name }}</code>
+              <span>· {{ group.elements.length }} elementi</span>
+            </p>
+            <ul class="shared-element-list">
+              <li v-for="element in group.elements" :key="element.id">
+                <span>{{ describeElementForUi(element) }}</span>
+                <span class="shared-element-actions">
+                  <button type="button" class="btn-link" @click="selectElementById(element.id)">
+                    Seleziona
+                  </button>
+                  <button type="button" class="btn-link warn" @click="handleDisconnectFromElement(element)">
+                    Scollega
+                  </button>
+                </span>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="data-sources">
+          <!-- Key per indice, NON per nome: se la key cambiasse col nome,
+               Vue ricreerebbe la riga durante la rinomina e il campo
+               perderebbe il focus a ogni tasto. -->
+          <div
+            v-for="(source, sourceIndex) in template.dataSources"
+            :key="sourceIndex"
+            class="data-row"
+            :class="{ shared: countElementsUsingDataSource(template, source.name) > 1 }"
+          >
+            <div class="data-row-header">
+              <input v-model="source.label" type="text" placeholder="Etichetta" />
+              <span
+                v-if="countElementsUsingDataSource(template, source.name) > 1"
+                class="usage-badge"
+                :title="`Usato da ${countElementsUsingDataSource(template, source.name)} elementi`"
+              >
+                ×{{ countElementsUsingDataSource(template, source.name) }}
+              </span>
+              <button
+                type="button"
+                class="icon-btn"
+                :title="countElementsUsingDataSource(template, source.name) > 0 ? 'In uso: elimina prima gli elementi sul canvas' : 'Elimina data source'"
+                @click="handleRemoveDataSource(source.name)"
+              >
+                ✕
+              </button>
+            </div>
+            <input
+              :value="source.name"
+              type="text"
+              placeholder="nome_variabile"
+              @change="handleDataSourceRename(source, $event.target.value, $event)"
+            />
+            <input v-model="source.defaultValue" type="text" placeholder="Valore di test" />
+          </div>
+          <button type="button" class="btn ghost" @click="addDataSource">+ Data source</button>
+        </div>
+        </details>
+
         <details class="section" :open="sections.label" @toggle="toggleSection('label', $event)">
         <summary>Etichetta</summary>
         <label>
@@ -1743,66 +1790,6 @@ function buildApiExample() {
         </p>
         </details>
 
-        <details class="section" :open="sections.batch" @toggle="toggleSection('batch', $event)">
-        <summary>Stampa manuale</summary>
-        <div class="batch-panel">
-          <label>
-            Numero di serie nel campo
-            <select v-model="batch.dataSource">
-              <option v-for="source in template.dataSources" :key="source.name" :value="source.name">
-                {{ source.label ?? source.name }}
-              </option>
-            </select>
-          </label>
-          <div class="inline-fields">
-            <label>
-              Da
-              <input v-model.number="batch.start" type="number" min="0" step="1" />
-            </label>
-            <label>
-              A
-              <input v-model.number="batch.end" type="number" min="0" step="1" />
-            </label>
-          </div>
-          <div class="inline-fields">
-            <label>
-              Passo
-              <input v-model.number="batch.step" type="number" min="1" step="1" />
-            </label>
-            <label>
-              Cifre (zeri davanti)
-              <input v-model.number="batch.pad" type="number" min="0" max="12" step="1" />
-            </label>
-          </div>
-          <div class="inline-fields">
-            <label>
-              Prefisso
-              <input v-model="batch.prefix" type="text" placeholder="es. CHL1225" />
-            </label>
-            <label>
-              Suffisso
-              <input v-model="batch.suffix" type="text" />
-            </label>
-          </div>
-          <label>
-            Copie per etichetta
-            <input v-model.number="batch.copies" type="number" min="1" max="100" step="1" />
-          </label>
-
-          <p class="hint">
-            <strong>{{ batchSummary }}</strong>
-            <template v-if="batchSample"><br />{{ batchSample }}</template>
-          </p>
-          <p v-if="batchCount > MAX_LABELS_PER_RUN" class="hint warn-box">
-            Troppe etichette in una volta: il massimo è {{ MAX_LABELS_PER_RUN }}.
-          </p>
-
-          <button type="button" class="btn primary" :disabled="!canPrintBatch" @click="handleBatchPrint">
-            Stampa serie
-          </button>
-        </div>
-        </details>
-
         <details v-if="isGraphicMode" class="section" :open="sections.preview" @toggle="toggleSection('preview', $event)">
           <summary>Anteprima di stampa</summary>
           <div class="batch-panel">
@@ -1822,6 +1809,15 @@ function buildApiExample() {
         </details>
         </div>
       </aside>
+
+      <section class="canvas-area">
+        <LabelCanvas
+          v-model:template="template"
+          v-model:selected-ids="selectedIds"
+          :data-values="dataValues"
+          @update-text-value="handleUpdateTextValue"
+        />
+      </section>
     </main>
 
     <div v-else class="loading">Caricamento template...</div>
@@ -1925,15 +1921,15 @@ function buildApiExample() {
 
 .toolbar-actions select {
   min-width: 220px;
-  min-height: 40px;
-  padding: 0.45rem 0.6rem;
+  min-height: 44px;
+  padding: 0.5rem 0.6rem;
   border-radius: 6px;
   border: none;
   font: inherit;
 }
 
 .toolbar-actions .btn {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0.6rem 1.1rem;
   align-self: flex-end;
 }
@@ -2051,8 +2047,8 @@ function buildApiExample() {
 }
 
 .printer-input {
-  min-height: 40px;
-  padding: 0.45rem 0.6rem;
+  min-height: 44px;
+  padding: 0.5rem 0.6rem;
   border: 1px solid #ccc;
   border-radius: 6px;
   font: inherit;
@@ -2062,7 +2058,7 @@ function buildApiExample() {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 290px;
+  grid-template-columns: 320px minmax(0, 1fr);
   gap: 0.75rem;
   padding: 0.75rem;
   overflow: hidden;
@@ -2114,7 +2110,7 @@ function buildApiExample() {
 .section > summary {
   cursor: pointer;
   user-select: none;
-  min-height: 40px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   gap: 0.4rem;
