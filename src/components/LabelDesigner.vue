@@ -1067,7 +1067,7 @@ function handleNewLayout() {
 
   template.value = startNewLayout(template.value)
   selectedLayoutId.value = ''
-  selectedElementIds.value = []
+  selectedIds.value = []
   showStatus('Nuovo layout pronto', 'info')
 }
 
