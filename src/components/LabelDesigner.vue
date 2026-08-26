@@ -30,6 +30,8 @@ import {
 import { cloneTemplateState } from '../utils/cloneSerializable.js'
 import { hasWork, startNewLayout } from '../utils/newLayout.js'
 import { resolutionForPrinter, shouldWarnResolution } from '../utils/printerResolution.js'
+import { describePrintMode, printModeForPrinter, shouldWarnPrintMode } from '../utils/printerPrintMode.js'
+import { loadPanelSections, savePanelSections } from '../utils/panelSections.js'
 import { printableMagnification, resizeKeepingRatio } from '../utils/aspectRatio.js'
 import {
   MAX_LABELS_PER_RUN,
@@ -74,6 +76,12 @@ const printers = ref([])
 const selectedPrinter = ref('')
 // Risoluzione dichiarata dal server per ogni stampante conosciuta.
 const printerResolutions = ref({})
+// Strada di stampa (zpl / graphic) dichiarata dal server per ogni stampante
+// conosciuta: il layout si allinea da solo quando si cambia stampante.
+const printerModes = ref({})
+// Quali sezioni dei pannelli laterali sono aperte: la scelta resta fra una
+// sessione e l'altra.
+const sections = ref(loadPanelSections())
 // Le immagini si ridimensionano a proporzioni bloccate: un logo schiacciato
 // non si nota sullo schermo e si vede benissimo stampato.
 const keepImageRatio = ref(true)
@@ -279,13 +287,14 @@ onMounted(async () => {
   window.addEventListener('keydown', handleKeydown)
 
   try {
-    const [{ printers: list, platform, diagnostics, printerResolutions: resolutions }, defaultTemplate, { templates }] = await Promise.all([
+    const [{ printers: list, platform, diagnostics, printerResolutions: resolutions, printerModes: modes }, defaultTemplate, { templates }] = await Promise.all([
       fetchPrinters(),
       fetchDefaultTemplate(),
       fetchTemplates().catch(() => ({ templates: [] })),
     ])
     printers.value = Array.isArray(list) ? list : []
     printerResolutions.value = resolutions && typeof resolutions === 'object' ? resolutions : {}
+    printerModes.value = modes && typeof modes === 'object' ? modes : {}
     printerPlatform.value = platform ?? ''
     selectedPrinter.value = pickDefaultPrinter(printers.value)
     if (printers.value.length === 0) {
@@ -771,6 +780,31 @@ const printMode = computed({
 
 const isGraphicMode = computed(() => printMode.value === 'graphic')
 
+const printerMode = computed(() => printModeForPrinter(printerModes.value, selectedPrinter.value))
+
+// Mandare ZPL a una stampante che non lo parla non da' errori: esce carta
+// bianca. Quando il server conosce la stampante, il layout si mette da solo
+// sulla sua strada; se poi qualcuno la cambia a mano, resta l'avviso.
+const printModeMismatch = computed(() => shouldWarnPrintMode(printMode.value, printerMode.value))
+
+function applyPrinterPrintMode() {
+  if (!printerMode.value || !template.value || printMode.value === printerMode.value) return
+  printMode.value = printerMode.value
+  showStatus(`${selectedPrinter.value}: layout impostato su ${describePrintMode(printerMode.value)}`, 'info')
+}
+
+watch(
+  () => [printerMode.value, template.value?.id],
+  () => {
+    applyPrinterPrintMode()
+  }
+)
+
+function toggleSection(key, event) {
+  sections.value[key] = Boolean(event?.target?.open)
+  savePanelSections(sections.value)
+}
+
 const batchCopies = computed(() => Math.max(1, Number(batch.value.copies) || 1))
 
 const batchCount = computed(() => serialRangeCount(batch.value))
@@ -1141,7 +1175,9 @@ function buildApiExample() {
       <div class="toolbar-actions">
         <label class="printer-field">
           Stampante
-          <span v-if="printerPlatform" class="platform-tag">{{ printerPlatform }}</span>
+          <span v-if="printerPlatform" class="platform-tag">
+            {{ printerPlatform }}<template v-if="printerMode"> · {{ printerMode === 'graphic' ? 'immagine' : 'ZPL' }}</template>
+          </span>
           <select v-if="printers.length" v-model="selectedPrinter">
             <option v-for="printer in printers" :key="printer" :value="printer">
               {{ printer }}
@@ -1203,7 +1239,8 @@ function buildApiExample() {
     <main v-if="template" class="workspace">
       <aside class="panel left">
         <div class="panel-scroll">
-        <h2>Layout</h2>
+        <details class="section" :open="sections.layout" @toggle="toggleSection('layout', $event)">
+        <summary>Layout</summary>
         <label>
           Nome layout
           <input v-model="template.name" type="text" />
@@ -1247,16 +1284,20 @@ function buildApiExample() {
         >
           Elimina dal server
         </button>
+        </details>
 
-        <h2>Elementi</h2>
+        <details class="section" :open="sections.elements" @toggle="toggleSection('elements', $event)">
+        <summary>Elementi</summary>
         <div class="palette">
           <button type="button" @click="addElement('text')">+ Testo</button>
           <button type="button" @click="addElement('barcode')">+ Barcode</button>
           <button type="button" @click="addElement('qr')">+ QR</button>
           <button type="button" @click="addElement('image')">+ Immagine</button>
         </div>
+        </details>
 
-        <h2>Named Data Sources</h2>
+        <details class="section" :open="sections.dataSources" @toggle="toggleSection('dataSources', $event)">
+        <summary>Named Data Sources</summary>
         <div v-if="sharedDataSources.length" class="shared-datasource-alert">
           <strong>Data source condivisi</strong>
           <p class="hint">
@@ -1320,6 +1361,7 @@ function buildApiExample() {
           </div>
           <button type="button" class="btn ghost" @click="addDataSource">+ Data source</button>
         </div>
+        </details>
         </div>
       </aside>
 
@@ -1334,7 +1376,8 @@ function buildApiExample() {
 
       <aside class="panel right">
         <div class="panel-scroll">
-        <h2>Proprietà</h2>
+        <details class="section" :open="sections.properties" @toggle="toggleSection('properties', $event)">
+        <summary>Proprietà</summary>
         <div v-if="selectedCount > 1" class="properties">
           <p class="hint">{{ selectedCount }} elementi selezionati</p>
           <p class="hint">Trascina per spostarli · Shift+click · Ctrl+C/V/D · Canc per eliminare</p>
@@ -1576,8 +1619,10 @@ function buildApiExample() {
           </div>
         </div>
         <p v-else class="hint">Seleziona uno o più elementi sul canvas · Ctrl+C/V/D</p>
+        </details>
 
-        <h2>Etichetta</h2>
+        <details class="section" :open="sections.label" @toggle="toggleSection('label', $event)">
+        <summary>Etichetta</summary>
         <label>
           Formato
           <select v-model="selectedFormatId">
@@ -1593,7 +1638,19 @@ function buildApiExample() {
             <option value="zpl">Comandi ZPL (Zebra, Citizen, compatibili)</option>
             <option value="graphic">Stampa normale di sistema (immagine)</option>
           </select>
-          <small class="hint">
+          <small v-if="printerMode && !printModeMismatch" class="hint ok-text">
+            {{ selectedPrinter }} vuole {{ describePrintMode(printerMode) }}: il layout è
+            allineato, impostato in automatico.
+          </small>
+          <small v-else-if="printModeMismatch" class="hint warn-box">
+            <strong>{{ selectedPrinter }} vuole {{ describePrintMode(printerMode) }}</strong>, il
+            layout è su {{ describePrintMode(printMode) }}. Stampata così, l'etichetta può uscire
+            bianca o illeggibile.
+            <button type="button" class="btn ghost compact" @click="applyPrinterPrintMode">
+              Usa {{ describePrintMode(printerMode) }}
+            </button>
+          </small>
+          <small v-else class="hint">
             Non tutte le stampanti parlano ZPL. Con "stampa normale" il server
             disegna l'etichetta e la manda alla coda di stampa come immagine,
             usando il driver installato: è la strada per stampanti come la
@@ -1684,9 +1741,10 @@ function buildApiExample() {
           Se la stampa esce tagliata sul bordo sinistro/alto, aumenta l'offset
           per spostare tutto il contenuto (es. 24 dots ≈ 2 mm a 300 dpi).
         </p>
-        </div>
+        </details>
 
-        <h2>Stampa manuale</h2>
+        <details class="section" :open="sections.batch" @toggle="toggleSection('batch', $event)">
+        <summary>Stampa manuale</summary>
         <div class="batch-panel">
           <label>
             Numero di serie nel campo
@@ -1743,14 +1801,17 @@ function buildApiExample() {
             Stampa serie
           </button>
         </div>
+        </details>
 
-        <div v-if="isGraphicMode" class="batch-panel">
-          <p class="devtools-label">Anteprima di stampa</p>
-          <img v-if="labelImagePreview" class="label-image-preview" :src="labelImagePreview" alt="Anteprima etichetta" />
-          <p v-else class="hint">Anteprima non disponibile: controlla il layout e la stampante.</p>
-        </div>
+        <details v-if="isGraphicMode" class="section" :open="sections.preview" @toggle="toggleSection('preview', $event)">
+          <summary>Anteprima di stampa</summary>
+          <div class="batch-panel">
+            <img v-if="labelImagePreview" class="label-image-preview" :src="labelImagePreview" alt="Anteprima etichetta" />
+            <p v-else class="hint">Anteprima non disponibile: controlla il layout e la stampante.</p>
+          </div>
+        </details>
 
-        <details class="devtools-panel">
+        <details class="section devtools-panel" :open="sections.devtools" @toggle="toggleSection('devtools', $event)">
           <summary>API &amp; ZPL</summary>
           <div class="devtools-body">
             <p class="devtools-label">API esempio</p>
@@ -1759,6 +1820,7 @@ function buildApiExample() {
             <pre class="zpl-preview">{{ zplPreview }}</pre>
           </div>
         </details>
+        </div>
       </aside>
     </main>
 
@@ -1812,13 +1874,16 @@ function buildApiExample() {
   flex-direction: column;
 }
 
+/* Barra alta abbastanza da respirare (min 64px) con controlli da almeno
+   40px: sono i bersagli che si prendono al volo anche col touch. */
 .toolbar {
   flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: 0.65rem 1.25rem;
+  min-height: 64px;
+  padding: 0.75rem 1.25rem;
   background: #16213e;
   color: #fff;
 }
@@ -1846,22 +1911,31 @@ function buildApiExample() {
 
 .toolbar-actions {
   display: flex;
-  align-items: end;
-  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
 }
 
 .toolbar-actions label {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.3rem;
   font-size: 0.8rem;
 }
 
 .toolbar-actions select {
   min-width: 220px;
-  padding: 0.4rem 0.5rem;
+  min-height: 40px;
+  padding: 0.45rem 0.6rem;
   border-radius: 6px;
   border: none;
+  font: inherit;
+}
+
+.toolbar-actions .btn {
+  min-height: 40px;
+  padding: 0.6rem 1.1rem;
+  align-self: flex-end;
 }
 
 .btn {
@@ -1977,6 +2051,7 @@ function buildApiExample() {
 }
 
 .printer-input {
+  min-height: 40px;
   padding: 0.45rem 0.6rem;
   border: 1px solid #ccc;
   border-radius: 6px;
@@ -2022,6 +2097,51 @@ function buildApiExample() {
 
 .panel h2:first-child {
   margin-top: 0;
+}
+
+/* Ogni sezione del pannello si apre e si chiude dal suo titolo: i pannelli
+   sono lunghi e chi lavora sempre sulle stesse cose vuole nascondere il resto. */
+.section {
+  border-top: 1px solid #eee;
+  padding: 0.35rem 0 0.5rem;
+}
+
+.section:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.section > summary {
+  cursor: pointer;
+  user-select: none;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #555;
+  list-style: none;
+}
+
+.section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.section > summary::before {
+  content: '▸';
+  font-size: 0.85rem;
+  transition: transform 0.15s ease;
+}
+
+.section[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.section[open] > summary {
+  margin-bottom: 0.5rem;
 }
 
 .layout-actions {
@@ -2272,21 +2392,8 @@ function buildApiExample() {
   image-rendering: pixelated;
 }
 
-.devtools-panel {
-  flex-shrink: 0;
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid #eee;
-}
-
-.devtools-panel summary {
-  cursor: pointer;
+.devtools-panel > summary {
   font-size: 0.82rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #555;
-  user-select: none;
 }
 
 .devtools-body {

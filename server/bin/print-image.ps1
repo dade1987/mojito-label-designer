@@ -59,8 +59,17 @@ try {
 
     $handler = {
         param($sender, $e)
-        # L'etichetta occupa tutta la pagina: la pagina e' l'etichetta.
-        $target = New-Object System.Drawing.Rectangle(0, 0, $e.PageBounds.Width, $e.PageBounds.Height)
+        # L'etichetta occupa tutta la pagina: la pagina e' l'etichetta. Se pero'
+        # il driver sostituisce la misura carta, la pagina non ha piu' le
+        # proporzioni del PNG: meglio un margine che un'etichetta stirata.
+        $pageWidth = [double]$e.PageBounds.Width
+        $pageHeight = [double]$e.PageBounds.Height
+        $scale = [Math]::Min($pageWidth / $image.Width, $pageHeight / $image.Height)
+        $drawWidth = [int][Math]::Max(1, [Math]::Round($image.Width * $scale))
+        $drawHeight = [int][Math]::Max(1, [Math]::Round($image.Height * $scale))
+        $offsetX = [int][Math]::Floor(($pageWidth - $drawWidth) / 2)
+        $offsetY = [int][Math]::Floor(($pageHeight - $drawHeight) / 2)
+        $target = New-Object System.Drawing.Rectangle($offsetX, $offsetY, $drawWidth, $drawHeight)
         $e.Graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::NearestNeighbor
         $e.Graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::Half
         $e.Graphics.DrawImage($image, $target)

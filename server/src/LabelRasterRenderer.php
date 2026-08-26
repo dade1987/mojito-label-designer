@@ -393,11 +393,23 @@ final class LabelRasterRenderer
 
         $targetWidth = TypeCaster::int($element['width'] ?? 0);
         $targetHeight = TypeCaster::int($element['height'] ?? 0);
-        $width = $targetWidth > 0 ? $targetWidth : imagesx($source);
-        $height = $targetHeight > 0 ? $targetHeight : imagesy($source);
+        $sourceWidth = imagesx($source);
+        $sourceHeight = imagesy($source);
+        $width = $targetWidth > 0 ? $targetWidth : $sourceWidth;
+        $height = $targetHeight > 0 ? $targetHeight : $sourceHeight;
+
+        // L'anteprima e lo ZPL mostrano la foto con le proporzioni originali,
+        // centrata nel riquadro (object-fit: contain): qui si fa lo stesso,
+        // altrimenti la stampa grafica esce stirata mentre lo schermo la
+        // mostrava giusta. Il margine resta trasparente, cioe' bianco.
+        $scale = min($width / $sourceWidth, $height / $sourceHeight);
+        $drawWidth = max(1, (int) round($sourceWidth * $scale));
+        $drawHeight = max(1, (int) round($sourceHeight * $scale));
+        $offsetX = intdiv($width - $drawWidth, 2);
+        $offsetY = intdiv($height - $drawHeight, 2);
 
         $resized = $this->transparentLayer($width, $height);
-        imagecopyresampled($resized, $source, 0, 0, 0, 0, $width, $height, imagesx($source), imagesy($source));
+        imagecopyresampled($resized, $source, $offsetX, $offsetY, 0, 0, $drawWidth, $drawHeight, $sourceWidth, $sourceHeight);
         imagedestroy($source);
 
         // Le termiche stampano solo nero o niente: la soglia è quella scelta

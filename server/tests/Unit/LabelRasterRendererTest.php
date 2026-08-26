@@ -241,6 +241,30 @@ final class LabelRasterRendererTest extends TestCase
         $this->assertFalse($this->isInk($rendered['image'], 42, 42));
     }
 
+    public function test_an_image_keeps_its_aspect_ratio_inside_the_element_box(): void
+    {
+        // Foto larga (40x20) tutta nera dentro un riquadro quadrato 40x40:
+        // deve restare larga e centrata, non stirata a riempire il quadrato.
+        $source = imagecreatetruecolor(40, 20);
+        $this->assertInstanceOf(\GdImage::class, $source);
+        imagefill($source, 0, 0, (int) imagecolorallocate($source, 0, 0, 0));
+        ob_start();
+        imagepng($source);
+        $png = (string) ob_get_clean();
+
+        $rendered = $this->render([
+            'labelWidth' => 200, 'labelHeight' => 200,
+            'elements' => [
+                ['type' => 'image', 'x' => 40, 'y' => 40, 'width' => 40, 'height' => 40, 'threshold' => 128, 'imageData' => 'data:image/png;base64,'.base64_encode($png)],
+            ],
+        ]);
+
+        // Fascia centrale piena (y 50..69), margini sopra e sotto bianchi.
+        $this->assertGreaterThan(0, $this->inkInBox($rendered, 40, 50, 80, 70));
+        $this->assertSame(0, $this->inkInBox($rendered, 40, 40, 80, 50));
+        $this->assertSame(0, $this->inkInBox($rendered, 40, 70, 80, 80));
+    }
+
     public function test_rotation_moves_the_text_along_the_other_axis(): void
     {
         $upright = $this->render([

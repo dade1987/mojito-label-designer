@@ -68,26 +68,35 @@ final class LabelPrinterService
     }
 
     /**
-     * @return array{printers: list<string>, platform: string}
+     * @return array{printers: list<string>, printerResolutions: array<string, int>, printerModes: array<string, string>, platform: string, diagnostics?: list<array{method: string, code: int, output: string}>}
      */
     public function listPrintersInfo(): array
     {
         $printers = $this->listPrinters();
-        // La risoluzione di ogni stampante, dove si puo' sapere: disegnare a
-        // 203 dpi cio' che verra' stampato a 300 produce etichette di misura
-        // sbagliata, e il designer non ha modo di accorgersene da solo.
+        // La risoluzione e la strada di stampa di ogni stampante, dove si
+        // possono sapere: disegnare a 203 dpi cio' che verra' stampato a 300
+        // produce etichette di misura sbagliata, e mandare ZPL a chi non lo
+        // parla produce carta bianca; il designer da solo non se ne accorge.
         $resolutions = [];
+        $modes = [];
         foreach ($printers as $printer) {
             $dpi = PrinterResolution::forPrinter($printer);
 
             if ($dpi !== null) {
                 $resolutions[$printer] = $dpi;
             }
+
+            $mode = PrinterPrintMode::forPrinter($printer);
+
+            if ($mode !== null) {
+                $modes[$printer] = $mode;
+            }
         }
 
         $info = [
             'printers' => $printers,
             'printerResolutions' => $resolutions,
+            'printerModes' => $modes,
             'platform' => PrinterPlatform::osFamily(),
         ];
 
