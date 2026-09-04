@@ -83,6 +83,7 @@ final class ApiHandlerTest extends TestCase
 
         $delete = $this->handler->handle('DELETE', '/api/templates/api-layout');
         $this->assertSame('deleted', $delete['payload']['status']);
+        $this->assertSame([], $this->handler->handle('GET', '/api/templates')['payload']['templates']);
     }
 
     public function test_get_template_by_id(): void
@@ -182,5 +183,52 @@ final class ApiHandlerTest extends TestCase
         } finally {
             putenv('MOJITO_PASSWORD');
         }
+    }
+
+    /**
+     * Il designer manda overwrite=false quando crede che il layout sia nuovo
+     * ("Salva con nome..." o primo salvataggio): se un'altra postazione ha
+     * gia' creato quell'identificativo, la risposta e' 409 e il file resta
+     * com'era. Senza flag, o con true, si sovrascrive come sempre.
+     */
+    public function test_saving_without_overwrite_on_an_existing_layout_is_a_conflict(): void
+    {
+        $this->handler->handle('POST', '/api/templates', json_encode([
+            'id' => 'shared', 'name' => 'Originale', 'elements' => [],
+        ], JSON_THROW_ON_ERROR));
+
+        $conflict = $this->handler->handle('POST', '/api/templates', json_encode([
+            'id' => 'shared', 'name' => 'Nuovo', 'elements' => [], 'overwrite' => false,
+        ], JSON_THROW_ON_ERROR));
+
+        $this->assertSame(409, $conflict['status']);
+        $this->assertSame(['id' => 'shared', 'name' => 'Originale'], $conflict['payload']['conflict']);
+        $this->assertStringContainsString('«Originale»', $conflict['payload']['error']);
+        $this->assertSame('Originale', $this->handler->handle('GET', '/api/templates/shared')['payload']['name']);
+
+        $overwritten = $this->handler->handle('POST', '/api/templates', json_encode([
+            'id' => 'shared', 'name' => 'Aggiornato', 'elements' => [], 'overwrite' => true,
+        ], JSON_THROW_ON_ERROR));
+
+        $this->assertSame(200, $overwritten['status']);
+        $this->assertSame('Aggiornato', $this->handler->handle('GET', '/api/templates/shared')['payload']['name']);
+
+        $legacy = $this->handler->handle('POST', '/api/templates', json_encode([
+            'id' => 'shared', 'name' => 'Senza flag', 'elements' => [],
+        ], JSON_THROW_ON_ERROR));
+
+        $this->assertSame(200, $legacy['status']);
+        $this->assertSame('Senza flag', $this->handler->handle('GET', '/api/templates/shared')['payload']['name']);
+    }
+
+    public function test_the_overwrite_flag_is_not_stored_in_the_layout(): void
+    {
+        $saved = $this->handler->handle('POST', '/api/templates', json_encode([
+            'id' => 'flagged', 'name' => 'Nuovo', 'elements' => [], 'overwrite' => false,
+        ], JSON_THROW_ON_ERROR));
+
+        $this->assertSame(200, $saved['status']);
+        $this->assertArrayNotHasKey('overwrite', $saved['payload']['template']);
+        $this->assertArrayNotHasKey('overwrite', $this->handler->handle('GET', '/api/templates/flagged')['payload']);
     }
 }

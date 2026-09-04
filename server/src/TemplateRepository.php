@@ -26,7 +26,11 @@ final class TemplateRepository
         $templates = [];
 
         foreach ($files as $file) {
-            $content = file_get_contents($file);
+            // Un file illeggibile (permessi, o una cartella che finisce in
+            // .json) si salta e basta: il warning PHP non deve arrivare a
+            // PHPUnit, che con stop-on-defect fermerebbe l'intera suite
+            // (e Infection segnerebbe "sfuggiti" mutanti mai eseguiti).
+            $content = @file_get_contents($file);
 
             if ($content === false) {
                 continue;
@@ -63,7 +67,7 @@ final class TemplateRepository
             throw new InvalidArgumentException('Template non trovato: '.$id);
         }
 
-        $content = file_get_contents($path);
+        $content = @file_get_contents($path);
 
         if ($content === false) {
             throw new RuntimeException('Impossibile leggere il template: '.$id);
@@ -79,14 +83,26 @@ final class TemplateRepository
     }
 
     /**
+     * Scrive il layout su disco.
+     *
+     * Con `$overwrite = false` un layout gia' presente con lo stesso
+     * identificativo non viene toccato: si lancia TemplateExistsException.
+     * E' la rete di sicurezza per "Salva con nome..." e per il salvataggio
+     * di un layout che il client crede nuovo ma che un'altra postazione ha
+     * gia' creato nel frattempo.
+     *
      * @param  array<string, mixed>  $template
      * @return array<string, mixed>
      */
-    public function save(array $template): array
+    public function save(array $template, bool $overwrite = true): array
     {
         $sanitized = $this->sanitize($template);
         $id = TypeCaster::string($sanitized['id']);
         $path = $this->pathFor($id);
+
+        if (! $overwrite && is_file($path)) {
+            throw new TemplateExistsException($id, $this->nameOf($id));
+        }
 
         $encoded = json_encode($sanitized, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
@@ -159,6 +175,19 @@ final class TemplateRepository
             }, $dataSourcesInput),
             'elements' => $template['elements'],
         ];
+    }
+
+    /**
+     * Il nome salvato nel file, o l'identificativo se il file non si legge:
+     * serve solo per un messaggio, non deve far fallire nulla.
+     */
+    private function nameOf(string $id): string
+    {
+        try {
+            return TypeCaster::string($this->find($id)['name'] ?? $id, $id);
+        } catch (RuntimeException) {
+            return $id;
+        }
     }
 
     private function pathFor(string $id): string

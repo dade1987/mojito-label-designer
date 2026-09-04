@@ -282,12 +282,29 @@ final class ApiHandler
     }
 
     /**
+     * Il body e' il layout stesso, piu' il flag `overwrite`: senza (o `true`)
+     * si sovrascrive come sempre, con `false` un layout gia' presente con lo
+     * stesso identificativo resta intatto e si risponde 409.
+     *
      * @param  array<string, mixed>  $body
      * @return array{status: int, payload: array<string, mixed>}
      */
     private function handleSaveTemplate(array $body): array
     {
-        $saved = $this->templates->save($body);
+        $overwrite = ($body['overwrite'] ?? true) !== false;
+        unset($body['overwrite']);
+
+        try {
+            $saved = $this->templates->save($body, $overwrite);
+        } catch (TemplateExistsException $exception) {
+            return [
+                'status' => 409,
+                'payload' => [
+                    'error' => $exception->getMessage(),
+                    'conflict' => ['id' => $exception->templateId, 'name' => $exception->existingName],
+                ],
+            ];
+        }
 
         return $this->ok([
             'status' => 'saved',

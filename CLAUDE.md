@@ -71,6 +71,8 @@ A template can be saved three ways (`src/utils/layoutStorage.js`):
 
 `sanitizeTemplateForSave` strips runtime-only fields before any of the three paths write data.
 
+Saving must never silently replace another layout (`src/utils/layoutSaveGuard.js`): "Salva server"/"Salva locale" update the open layout, but if its **name changed** they ask before overwriting (`findOverwriteTarget` + `overwriteQuestion`); **"Salva con nome…"** saves a copy with a fresh `id` (`prepareSaveAs`). The client sends `overwrite: false` whenever it believes the id is new, and `TemplateRepository::save($template, overwrite: false)` throws `TemplateExistsException` → HTTP 409 if the file already exists (the default template is loaded without its `id`, so it is a starting point rather than a shared file).
+
 ### Backend: framework-free PHP, PSR-4 under `Mojito\Label\`
 
 `server/public/index.php` is the single entrypoint — no router library. It builds a `LabelPrinterService` + `TemplateRepository`, hands the method/path/body to `ApiHandler::handle()`, which does its own routing via a `match(true)` over method+path pairs and returns `{status, payload}` for `index.php` to emit as JSON.

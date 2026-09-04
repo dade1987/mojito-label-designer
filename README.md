@@ -154,7 +154,8 @@ L'API Mojito viene servita dalle route del server host (`/api/health`, `/api/pri
 | Modo | Dove finisce |
 |------|--------------|
 | **Salva su file** | `.mojito.json` sul disco (dialog Electron o download browser) |
-| **Salva server** | `server/storage/templates/{id}.json` |
+| **Salva server** | `server/storage/templates/{id}.json` (chiede conferma se il nome è cambiato; `POST /api/templates` con `overwrite: false` → 409 se l'id esiste già) |
+| **Salva con nome…** | come sopra, ma una copia con `id` nuovo: l'originale resta intatto |
 | **Salva locale** | `localStorage` del browser (riapertura rapida da UI) |
 
 Il file `.mojito.json` contiene struttura + data sources + elementi, **senza** valori di test — versionabile in git.

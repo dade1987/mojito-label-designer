@@ -63,10 +63,18 @@ export function fetchTemplate(id) {
   return request(`/api/templates/${encodeURIComponent(id)}`)
 }
 
-export function saveTemplate(template) {
+/**
+ * `overwrite: false` chiede al server di non toccare un layout già presente
+ * con lo stesso identificativo (risponde 409): è la rete di sicurezza di
+ * "Salva con nome…" e del primo salvataggio. Senza opzione il server si
+ * comporta come sempre.
+ */
+export function saveTemplate(template, { overwrite } = {}) {
+  const body = overwrite === undefined ? template : { ...template, overwrite }
+
   return request('/api/templates', {
     method: 'POST',
-    body: JSON.stringify(template),
+    body: JSON.stringify(body),
   })
 }
 

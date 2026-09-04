@@ -29,6 +29,14 @@ import {
 } from '../utils/templateStore.js'
 import { cloneTemplateState } from '../utils/cloneSerializable.js'
 import { hasWork, startNewLayout } from '../utils/newLayout.js'
+import {
+  asUnsavedStartingPoint,
+  findLayoutByName,
+  findOverwriteTarget,
+  overwriteQuestion,
+  prepareSaveAs,
+  proposeSaveAsName,
+} from '../utils/layoutSaveGuard.js'
 import { resolutionForPrinter, shouldWarnResolution } from '../utils/printerResolution.js'
 import { describePrintMode, printModeForPrinter, shouldWarnPrintMode } from '../utils/printerPrintMode.js'
 import { loadPanelSections, savePanelSections } from '../utils/panelSections.js'
@@ -369,9 +377,13 @@ function finalizeTemplateState() {
 
 async function resolveInitialTemplate(defaultTemplate) {
   const remembered = loadRememberedLayoutId()
+  // Il default è un punto di partenza, non un layout salvato: senza id il
+  // primo salvataggio crea un layout nuovo invece di scrivere sempre sullo
+  // stesso file da tutte le postazioni.
+  const startingPoint = asUnsavedStartingPoint(defaultTemplate)
 
   if (!remembered) {
-    return { template: defaultTemplate, selectedLayout: '' }
+    return { template: startingPoint, selectedLayout: '' }
   }
 
   if (remembered.source === 'local') {
@@ -398,7 +410,7 @@ async function resolveInitialTemplate(defaultTemplate) {
     }
   }
 
-  return { template: defaultTemplate, selectedLayout: '' }
+  return { template: startingPoint, selectedLayout: '' }
 }
 
 function refreshLocalLayouts() {
@@ -915,12 +927,41 @@ async function handleQuickPrint() {
   }
 }
 
+/**
+ * Se il salvataggio scriverebbe sopra un layout con un altro nome, si chiede
+ * prima: quasi sempre l'utente voleva un layout nuovo, non perdere il vecchio.
+ * Torna true se si può procedere.
+ */
+function confirmOverwrite(target, where) {
+  if (!target?.renamed) return true
+
+  if (window.confirm(overwriteQuestion(target, template.value.name, where))) return true
+
+  showStatus(
+    `Salvataggio annullato: «${target.name}» è rimasto com'era. Per crearne uno nuovo usa «Salva con nome…».`,
+    'info'
+  )
+
+  return false
+}
+
 function handleSaveLocal() {
   if (!template.value) return
+
+  const target = findOverwriteTarget(listLocalLayouts(), template.value)
+  if (!confirmOverwrite(target, 'in locale')) return
+
   const saved = saveLocalLayout(template.value)
   template.value.id = saved.id
   refreshLocalLayouts()
   showStatus(`Layout salvato in locale: ${saved.name}`, 'success')
+}
+
+async function refreshServerLayouts() {
+  const { templates } = await fetchTemplates()
+  serverLayouts.value = templates
+
+  return templates
 }
 
 async function handleSaveServer() {
@@ -929,12 +970,59 @@ async function handleSaveServer() {
   isBusy.value = true
 
   try {
-    const result = await saveTemplate(template.value)
+    // L'elenco si rilegge adesso: un'altra postazione può aver salvato nel
+    // frattempo. Il server rifiuta comunque (409) se crediamo di creare un
+    // layout nuovo e invece l'identificativo esiste già.
+    const target = findOverwriteTarget(await refreshServerLayouts(), template.value)
+    if (!confirmOverwrite(target, 'sul server')) return
+
+    const result = await saveTemplate(template.value, { overwrite: target !== null })
     template.value = hydrateTemplate(result.template)
     rememberActiveLayout('server', result.template.id)
-    const { templates } = await fetchTemplates()
-    serverLayouts.value = templates
+    await refreshServerLayouts()
     showStatus(`Layout salvato sul server: ${result.template.name}`, 'success')
+  } catch (error) {
+    showStatus(error.message, 'error')
+  } finally {
+    isBusy.value = false
+  }
+}
+
+/**
+ * Salva sul server una copia con identificativo nuovo: il layout aperto
+ * resta com'è e si continua a lavorare sulla copia.
+ */
+async function handleSaveAsServer() {
+  if (!template.value) return
+
+  isBusy.value = true
+
+  try {
+    const templates = await refreshServerLayouts()
+    const requested = window.prompt(
+      'Nome del nuovo layout sul server:',
+      proposeSaveAsName(template.value.name, templates)
+    )
+    if (requested === null) return
+
+    const name = requested.trim()
+    if (name === '') {
+      showStatus('Serve un nome per il nuovo layout.', 'error')
+      return
+    }
+
+    const taken = findLayoutByName(templates, name)
+    if (taken) {
+      showStatus(`Sul server esiste già il layout «${taken.name}»: scegli un altro nome.`, 'error')
+      return
+    }
+
+    const result = await saveTemplate(prepareSaveAs(template.value, name), { overwrite: false })
+    template.value = hydrateTemplate(result.template)
+    rememberActiveLayout('server', result.template.id)
+    await refreshServerLayouts()
+    selectedLayoutId.value = `server:${result.template.id}`
+    showStatus(`Nuovo layout salvato sul server: ${result.template.name}`, 'success')
   } catch (error) {
     showStatus(error.message, 'error')
   } finally {
@@ -1311,6 +1399,15 @@ function buildApiExample() {
           <button type="button" class="btn ghost" @click="handleSaveLocal">Salva locale</button>
           <button type="button" class="btn ghost" :disabled="isBusy" @click="handleSaveServer">
             Salva server
+          </button>
+          <button
+            type="button"
+            class="btn ghost"
+            :disabled="isBusy"
+            title="Salva sul server una copia con un altro nome: il layout aperto resta com'è"
+            @click="handleSaveAsServer"
+          >
+            Salva con nome…
           </button>
           <button type="button" class="btn ghost" @click="handleSaveToFile">Salva su file</button>
           <button type="button" class="btn ghost" @click="handleOpenFromFile">Apri da file</button>

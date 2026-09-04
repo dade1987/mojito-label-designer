@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mojito\Label\Tests\Unit;
 
 use InvalidArgumentException;
+use Mojito\Label\TemplateExistsException;
 use Mojito\Label\TemplateRepository;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -305,5 +306,86 @@ final class TemplateRepositoryTest extends TestCase
         ]);
 
         $this->assertSame('zpl', $saved['printMode']);
+    }
+
+    /**
+     * "Salva con nome..." e il salvataggio di un layout che il client crede
+     * nuovo passano con overwrite=false: se sul server c'e' gia' un file con
+     * quell'identificativo non va toccato, e il messaggio deve dire come si
+     * chiama il layout che si stava per perdere.
+     */
+    public function test_save_without_overwrite_refuses_an_existing_id(): void
+    {
+        $repository = new TemplateRepository($this->tempDir);
+        $repository->save(['id' => 'shared', 'name' => 'Originale', 'elements' => []]);
+
+        try {
+            $repository->save(['id' => 'shared', 'name' => 'Nuovo', 'elements' => [['type' => 'text']]], false);
+            $this->fail('Doveva rifiutare la sovrascrittura.');
+        } catch (TemplateExistsException $exception) {
+            $this->assertSame('shared', $exception->templateId);
+            $this->assertSame('Originale', $exception->existingName);
+            $this->assertStringContainsString('«Originale»', $exception->getMessage());
+            $this->assertStringContainsString('Salva con nome', $exception->getMessage());
+        }
+
+        $this->assertSame('Originale', $repository->find('shared')['name']);
+        $this->assertSame([], $repository->find('shared')['elements']);
+    }
+
+    public function test_save_without_overwrite_creates_a_new_id(): void
+    {
+        $repository = new TemplateRepository($this->tempDir);
+
+        $saved = $repository->save(['id' => 'fresh', 'name' => 'Nuovo', 'elements' => []], false);
+
+        $this->assertSame('fresh', $saved['id']);
+        $this->assertSame('Nuovo', $repository->find('fresh')['name']);
+    }
+
+    public function test_save_overwrites_by_default_as_it_always_did(): void
+    {
+        $repository = new TemplateRepository($this->tempDir);
+        $repository->save(['id' => 'shared', 'name' => 'Originale', 'elements' => []]);
+
+        $repository->save(['id' => 'shared', 'name' => 'Aggiornato', 'elements' => []]);
+
+        $this->assertSame('Aggiornato', $repository->find('shared')['name']);
+    }
+
+    public function test_save_with_overwrite_still_replaces_the_existing_layout(): void
+    {
+        $repository = new TemplateRepository($this->tempDir);
+        $repository->save(['id' => 'shared', 'name' => 'Originale', 'elements' => []]);
+
+        $repository->save(['id' => 'shared', 'name' => 'Aggiornato', 'elements' => []], true);
+
+        $this->assertSame('Aggiornato', $repository->find('shared')['name']);
+    }
+
+    public function test_conflict_message_falls_back_to_the_id_when_the_file_is_unreadable(): void
+    {
+        $repository = new TemplateRepository($this->tempDir);
+        file_put_contents($this->tempDir.'/broken.json', '{non-json');
+
+        try {
+            $repository->save(['id' => 'broken', 'name' => 'Nuovo', 'elements' => []], false);
+            $this->fail('Doveva rifiutare la sovrascrittura.');
+        } catch (TemplateExistsException $exception) {
+            $this->assertSame('broken', $exception->existingName);
+        }
+    }
+
+    public function test_conflict_message_falls_back_to_the_id_when_the_file_has_no_name(): void
+    {
+        $repository = new TemplateRepository($this->tempDir);
+        file_put_contents($this->tempDir.'/anon.json', '{"elements":[]}');
+
+        try {
+            $repository->save(['id' => 'anon', 'name' => 'Nuovo', 'elements' => []], false);
+            $this->fail('Doveva rifiutare la sovrascrittura.');
+        } catch (TemplateExistsException $exception) {
+            $this->assertSame('anon', $exception->existingName);
+        }
     }
 }
