@@ -47,6 +47,11 @@ final class ZplBuilder
      */
     public function renderTemplate(array $template, array $values = []): string
     {
+        // Quello che il chiamante non passa lo mette il layout, con il valore
+        // dichiarato sulla sorgente dati: un campo che nessuno riempie deve
+        // restare come l'ha disegnato chi ha fatto l'etichetta, non sparire.
+        $values = array_merge(TemplateDefaults::forTemplate($template), $values);
+
         $width = TypeCaster::int($template['labelWidth'] ?? 400, 400);
         $height = TypeCaster::int($template['labelHeight'] ?? 300, 300);
         $dpi = TypeCaster::int($template['dpi'] ?? 203, 203);

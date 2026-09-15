@@ -308,4 +308,37 @@ final class LabelRasterRendererTest extends TestCase
 
         $this->assertSame(0, $this->inkCount($rendered['image']));
     }
+
+    /**
+     * Anche l'etichetta disegnata (stampanti che non parlano ZPL) deve usare
+     * i valori di esempio del layout per i campi che nessuno ha passato:
+     * altrimenti esce un'immagine con i testi mancanti.
+     */
+    public function test_a_data_source_default_fills_what_the_caller_did_not_pass(): void
+    {
+        $template = [
+            'labelWidth' => 400,
+            'labelHeight' => 200,
+            'dpi' => 203,
+            'dataSources' => [
+                ['name' => 'sn', 'defaultValue' => 'SN-DI-ESEMPIO'],
+                ['name' => 'descrizione', 'defaultValue' => 'Batteria 48V'],
+            ],
+            'elements' => [
+                ['type' => 'text', 'x' => 10, 'y' => 10, 'dataSource' => 'sn', 'fontHeight' => 30, 'fontWidth' => 30],
+                ['type' => 'text', 'x' => 10, 'y' => 60, 'dataSource' => 'descrizione', 'fontHeight' => 30, 'fontWidth' => 30],
+            ],
+        ];
+
+        $renderer = new LabelRasterRenderer;
+
+        $conNulla = $renderer->renderPng(['labelWidth' => 400, 'labelHeight' => 200, 'dpi' => 203, 'elements' => []]);
+        $conDefault = $renderer->renderPng($template);
+        $conValore = $renderer->renderPng($template, ['sn' => 'CHL134BCL20S08261']);
+
+        // Con i default si disegna qualcosa (l'etichetta vuota e' diversa)...
+        $this->assertNotSame($conNulla, $conDefault);
+        // ...e passare un valore vero cambia ancora il disegno.
+        $this->assertNotSame($conDefault, $conValore);
+    }
 }

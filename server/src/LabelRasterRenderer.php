@@ -53,6 +53,10 @@ final class LabelRasterRenderer
      */
     public function renderImage(array $template, array $values = []): GdImage
     {
+        // Come per lo ZPL: i campi non passati li riempie il layout con i
+        // valori dichiarati sulle sue sorgenti dati.
+        $values = array_merge(TemplateDefaults::forTemplate($template), $values);
+
         [$width, $height] = $this->sensibleSize(
             TypeCaster::int($template['labelWidth'] ?? 0),
             TypeCaster::int($template['labelHeight'] ?? 0),

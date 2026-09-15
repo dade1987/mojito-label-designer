@@ -198,6 +198,59 @@ final class ZplBuilderTest extends TestCase
         $this->assertStringContainsString('DEF', $zpl);
     }
 
+    /**
+     * Il designer scrive il valore di esempio sulla SORGENTE DATI, non
+     * sull'elemento. Chi stampa dal server (pannello, postazione) passa solo
+     * i campi che conosce: senza questo ripiego tutti gli altri escono vuoti
+     * e l'etichetta arriva muta, senza nessuna scritta.
+     */
+    public function test_a_data_source_default_fills_what_the_caller_did_not_pass(): void
+    {
+        $template = [
+            'dataSources' => [
+                ['name' => 'sn', 'label' => 'SN', 'defaultValue' => 'SN-DI-ESEMPIO'],
+                ['name' => 'descrizione', 'label' => 'Descrizione', 'defaultValue' => 'Batteria 48V'],
+            ],
+            'elements' => [
+                ['type' => 'text', 'x' => 0, 'y' => 0, 'dataSource' => 'sn'],
+                ['type' => 'text', 'x' => 0, 'y' => 40, 'dataSource' => 'descrizione'],
+            ],
+        ];
+
+        $zpl = $this->builder->renderTemplate($template, ['sn' => 'CHL134BCL20S08261']);
+
+        // Il valore passato vince sul default...
+        $this->assertStringContainsString('CHL134BCL20S08261', $zpl);
+        $this->assertStringNotContainsString('SN-DI-ESEMPIO', $zpl);
+        // ...e quello che nessuno ha passato resta come l'ha disegnato chi
+        // ha fatto il layout, invece di sparire.
+        $this->assertStringContainsString('Batteria 48V', $zpl);
+    }
+
+    public function test_an_explicit_empty_value_still_wins_over_the_default(): void
+    {
+        $zpl = $this->builder->renderTemplate([
+            'dataSources' => [['name' => 'sn', 'defaultValue' => 'NON-DEVE-USCIRE']],
+            'elements' => [['type' => 'text', 'x' => 0, 'y' => 0, 'dataSource' => 'sn']],
+        ], ['sn' => '']);
+
+        $this->assertStringNotContainsString('NON-DEVE-USCIRE', $zpl);
+    }
+
+    public function test_data_sources_without_a_name_or_a_default_are_ignored(): void
+    {
+        $zpl = $this->builder->renderTemplate([
+            'dataSources' => [
+                ['label' => 'senza nome', 'defaultValue' => 'X'],
+                ['name' => 'senza_default'],
+                'non e un array',
+            ],
+            'elements' => [['type' => 'text', 'x' => 0, 'y' => 0, 'dataSource' => 'senza_default']],
+        ]);
+
+        $this->assertStringNotContainsString('^FDX^FS', $zpl);
+    }
+
     public function test_render_text_bold_uses_double_strike(): void
     {
         $zpl = $this->builder->renderTemplate([
