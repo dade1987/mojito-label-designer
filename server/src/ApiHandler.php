@@ -12,6 +12,7 @@ final class ApiHandler
     public function __construct(
         private readonly LabelPrinterService $service,
         private readonly TemplateRepository $templates,
+        private readonly ?PrintDestinations $destinations = null,
     ) {}
 
     /**
@@ -52,7 +53,7 @@ final class ApiHandler
 
             return match (true) {
                 $method === 'GET' && $path === '/api/health' => $this->ok(['status' => 'ok']),
-                $method === 'GET' && $path === '/api/printers' => $this->ok($this->service->listPrintersInfo()),
+                $method === 'GET' && $path === '/api/printers' => $this->ok($this->printersInfo()),
                 $method === 'GET' && $path === '/api/template/default' => $this->ok($this->defaultTemplate()),
                 $method === 'GET' && $path === '/api/templates' => $this->ok(['templates' => $this->templates->list()]),
                 $method === 'GET' && preg_match('#^/api/templates/([^/]+)$#', $path, $matches) === 1 => $this->ok($this->templates->find($matches[1])),
@@ -213,6 +214,29 @@ final class ApiHandler
             return $this->error(500, 'Stampa rifiutata: '.$total.' etichette superano il massimo di '.LabelPrinterService::MAX_COPIES.' per richiesta.');
         }
 
+        // Una destinazione offerta da chi ospita Mojito: le si consegna lo ZPL
+        // intero, e la stampa (o la coda) la fa lei.
+        if ($this->destinations !== null && $this->destinations->handles($printer)) {
+            $rawZpl = isset($body['zpl']) && is_string($body['zpl']) && $body['zpl'] !== '' ? $body['zpl'] : null;
+            $zpl = $rawZpl !== null
+                ? str_repeat($rawZpl, $copies)
+                : $this->service->buildSeriesZpl(
+                    array_map(static fn (array $values): array => ['values' => $values] + $body, $jobs),
+                    $copies
+                );
+            $labels = $rawZpl !== null ? $copies : count($jobs) * $copies;
+            $result = $this->destinations->send($printer, $zpl, $labels);
+
+            return $this->ok([
+                'status' => $result['status'],
+                'printed' => $labels,
+                'copies' => $copies,
+                'mode' => LabelPrinterService::MODE_ZPL,
+                'printer' => $printer,
+                'method' => 'destination',
+            ]);
+        }
+
         // Tutte le etichette della richiesta in un lavoro di stampa solo: uno
         // per etichetta fa ripartire la stampante ogni volta.
         if (isset($body['zpl']) && is_string($body['zpl']) && $body['zpl'] !== '') {
@@ -243,6 +267,33 @@ final class ApiHandler
         }
 
         return $this->ok($payload);
+    }
+
+    /**
+     * Le stampanti del server, piu' le destinazioni offerte da chi ospita
+     * Mojito, con il nome da mostrare e la modalita' (sempre ZPL).
+     *
+     * @return array<string, mixed>
+     */
+    private function printersInfo(): array
+    {
+        $info = $this->service->listPrintersInfo();
+
+        if ($this->destinations === null) {
+            return $info;
+        }
+
+        $labels = [];
+
+        foreach ($this->destinations->printers() as $destination) {
+            $info['printers'][] = $destination['value'];
+            $labels[$destination['value']] = $destination['label'];
+            $info['printerModes'][$destination['value']] = LabelPrinterService::MODE_ZPL;
+        }
+
+        $info['printerLabels'] = $labels;
+
+        return $info;
     }
 
     /**

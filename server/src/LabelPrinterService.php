@@ -233,6 +233,26 @@ final class LabelPrinterService
     }
 
     /**
+     * Lo ZPL di una serie, senza stamparlo: ogni etichetta ripetuta per le sue
+     * copie, una dopo l'altra (1, 1, 2, 2, ...). Sempre ZPL, anche per i
+     * layout pensati per le stampanti a immagine: serve a chi lo consegna a
+     * una stampante ZPL per altra strada.
+     *
+     * @param  list<array<string, mixed>>  $jobs
+     */
+    public function buildSeriesZpl(array $jobs, int $copies = 1): string
+    {
+        $copies = max(1, $copies);
+        $zpl = '';
+
+        foreach ($jobs as $data) {
+            $zpl .= str_repeat($this->buildZpl($data), $copies);
+        }
+
+        return $zpl;
+    }
+
+    /**
      * Una serie di etichette (una per pacco, per esempio) in un lavoro solo.
      *
      * In ZPL si concatenano i formati, ciascuno ripetuto per le sue copie
