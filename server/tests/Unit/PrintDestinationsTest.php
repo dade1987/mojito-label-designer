@@ -172,7 +172,7 @@ final class PrintDestinationsTest extends TestCase
             'copies' => 3,
         ]));
 
-        $this->assertSame('^XA^FDRAW^FS^XZ^XA^FDRAW^FS^XZ^XA^FDRAW^FS^XZ', $this->sent[0]['zpl']);
+        $this->assertSame('^XA^MMR^FDRAW^FS^XZ^XA^MMR^FDRAW^FS^XZ^XA^MMT^FDRAW^FS^XZ', $this->sent[0]['zpl']);
         $this->assertSame(3, $this->sent[0]['labels']);
     }
 
@@ -246,6 +246,8 @@ final class PrintDestinationsTest extends TestCase
 
         preg_match_all('/\^FD([AB])\^FS/', $zpl, $matches);
         $this->assertSame(['A', 'A', 'B', 'B'], $matches[1]);
+        $this->assertSame(3, substr_count($zpl, '^MMR'));
+        $this->assertSame(1, substr_count($zpl, '^MMT'));
         $this->assertSame('', $service->buildSeriesZpl([], 3));
     }
 }

@@ -221,15 +221,15 @@ final class LabelPrinterService
 
         $copies = max(1, $copies);
 
-        // Le copie partono in un lavoro solo: rimandare la stessa etichetta N
-        // volte fa ripartire la stampante a ogni copia.
+        // Le copie partono in un lavoro solo, e di fila: rimandare la stessa
+        // etichetta N volte fa ripartire la stampante a ogni copia.
         if ($this->resolvePrintMode($data) === self::MODE_GRAPHIC) {
             $this->printPng($this->renderPng($data), LabelMedia::fromTemplate($this->templateOf($data)), $copies);
 
             return;
         }
 
-        $this->printZpl(str_repeat($this->buildZpl($data), $copies));
+        $this->printZpl(ZplBatch::repeat($this->buildZpl($data), $copies));
     }
 
     /**
@@ -249,14 +249,15 @@ final class LabelPrinterService
             $zpl .= str_repeat($this->buildZpl($data), $copies);
         }
 
-        return $zpl;
+        return ZplBatch::continuous($zpl);
     }
 
     /**
      * Una serie di etichette (una per pacco, per esempio) in un lavoro solo.
      *
      * In ZPL si concatenano i formati, ciascuno ripetuto per le sue copie
-     * (1, 1, 2, 2, ...): la stampante li esegue di fila senza fermarsi.
+     * (1, 1, 2, 2, ...), e fra l'uno e l'altro la carta non torna indietro
+     * (ZplBatch): la stampante li esegue di fila senza fermarsi.
      * Le etichette disegnate sono immagini diverse e non si possono unire in
      * un solo file: partono una per volta, ciascuna con le sue copie in un
      * lavoro solo.
@@ -284,7 +285,7 @@ final class LabelPrinterService
         }
 
         if ($zpl !== '') {
-            $this->printZpl($zpl);
+            $this->printZpl(ZplBatch::continuous($zpl));
         }
     }
 

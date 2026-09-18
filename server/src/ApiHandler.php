@@ -219,7 +219,7 @@ final class ApiHandler
         if ($this->destinations !== null && $this->destinations->handles($printer)) {
             $rawZpl = isset($body['zpl']) && is_string($body['zpl']) && $body['zpl'] !== '' ? $body['zpl'] : null;
             $zpl = $rawZpl !== null
-                ? str_repeat($rawZpl, $copies)
+                ? ZplBatch::repeat($rawZpl, $copies)
                 : $this->service->buildSeriesZpl(
                     array_map(static fn (array $values): array => ['values' => $values] + $body, $jobs),
                     $copies
@@ -240,7 +240,7 @@ final class ApiHandler
         // Tutte le etichette della richiesta in un lavoro di stampa solo: uno
         // per etichetta fa ripartire la stampante ogni volta.
         if (isset($body['zpl']) && is_string($body['zpl']) && $body['zpl'] !== '') {
-            $this->service->printZpl(str_repeat($body['zpl'], $copies));
+            $this->service->printZpl(ZplBatch::repeat($body['zpl'], $copies));
 
             $printed = $copies;
             $mode = LabelPrinterService::MODE_ZPL;
