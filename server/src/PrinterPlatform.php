@@ -69,31 +69,34 @@ final class PrinterPlatform
      *
      * @return list<string>
      */
-    public static function buildGraphicPrintCommands(string $printerName, string $filePath, LabelMedia $media, string $tempDir = ''): array
+    public static function buildGraphicPrintCommands(string $printerName, string $filePath, LabelMedia $media, string $tempDir = '', int $copies = 1): array
     {
         if (self::isWindows()) {
-            return self::buildWindowsGraphicPrintCommands($printerName, $filePath, $media, $tempDir);
+            return self::buildWindowsGraphicPrintCommands($printerName, $filePath, $media, $tempDir, $copies);
         }
 
-        return [self::buildUnixGraphicPrintCommand($printerName, $filePath, $media)];
+        return [self::buildUnixGraphicPrintCommand($printerName, $filePath, $media, $copies)];
     }
 
-    public static function buildUnixGraphicPrintCommand(string $printerName, string $filePath, LabelMedia $media): string
+    public static function buildUnixGraphicPrintCommand(string $printerName, string $filePath, LabelMedia $media, int $copies = 1): string
     {
         // Niente "-o raw": quello manderebbe alla stampante i byte del PNG.
         // Il formato carta va dichiarato, altrimenti CUPS assume A4 e stampa
         // l'etichetta grande come un francobollo in cima al foglio.
+        // Le copie in un lavoro solo (-n): rimandare l'immagine N volte fa
+        // ripartire la stampante a ogni etichetta.
         return 'lp -d '.escapeshellarg($printerName)
             .' -o '.escapeshellarg('media='.$media->cupsMediaName())
             .' -o fit-to-page'
             .' -o orientation-requested=3'
+            .($copies > 1 ? ' -n '.$copies : '')
             .' '.escapeshellarg($filePath);
     }
 
     /**
      * @return list<string>
      */
-    public static function buildWindowsGraphicPrintCommands(string $printerName, string $filePath, LabelMedia $media, string $tempDir = ''): array
+    public static function buildWindowsGraphicPrintCommands(string $printerName, string $filePath, LabelMedia $media, string $tempDir = '', int $copies = 1): array
     {
         $powershell = self::windowsPowerShellExecutable();
         $script = self::windowsImagePrintScriptPath();
@@ -107,6 +110,7 @@ final class PrinterPlatform
                 .' -FilePath '.escapeshellarg($filePath)
                 .' -WidthMm '.escapeshellarg(number_format($media->widthMillimetres(), 2, '.', ''))
                 .' -HeightMm '.escapeshellarg(number_format($media->heightMillimetres(), 2, '.', ''))
+                .($copies > 1 ? ' -Copies '.escapeshellarg((string) $copies) : '')
                 .' -TempDir '.escapeshellarg($workTemp),
         ];
     }

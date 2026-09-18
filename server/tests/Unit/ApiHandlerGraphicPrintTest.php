@@ -132,8 +132,10 @@ final class ApiHandlerGraphicPrintTest extends TestCase
             'values' => ['serial' => 'CHL12251'],
         ]);
 
+        // Tre copie, un solo lavoro di stampa: la coda le stampa di fila.
         $this->assertSame(3, $response['payload']['printed']);
-        $this->assertCount(3, $this->commands);
+        $this->assertCount(1, $this->commands);
+        $this->assertStringContainsString(' -n 3 ', $this->commands[0]);
     }
 
     public function test_a_series_of_labels_is_printed_in_one_request(): void
@@ -161,8 +163,9 @@ final class ApiHandlerGraphicPrintTest extends TestCase
             'jobs' => [['serial' => 'A'], ['serial' => 'B']],
         ]);
 
+        // In ZPL la serie intera, copie comprese, e' un lavoro solo.
         $this->assertSame(4, $response['payload']['printed']);
-        $this->assertCount(4, $this->commands);
+        $this->assertCount(1, $this->commands);
     }
 
     public function test_an_unreasonable_run_is_refused_before_printing_anything(): void

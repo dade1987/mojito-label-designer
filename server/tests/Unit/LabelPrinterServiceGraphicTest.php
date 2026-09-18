@@ -144,13 +144,18 @@ final class LabelPrinterServiceGraphicTest extends TestCase
         $this->assertStringContainsString('-o raw', $this->commands[0]);
     }
 
-    public function test_copies_are_printed_one_after_the_other(): void
+    /**
+     * Le copie si chiedono alla coda in un lavoro solo: rimandare l'immagine
+     * N volte faceva ripartire la stampante a ogni etichetta.
+     */
+    public function test_copies_are_one_print_job(): void
     {
         $service = new LabelPrinterService(commandRunner: $this->runner(), printerName: 'P1');
 
         $service->printJob($this->graphicJob(), 3);
 
-        $this->assertCount(3, $this->commands);
+        $this->assertCount(1, $this->commands);
+        $this->assertStringContainsString(' -n 3 ', $this->commands[0]);
     }
 
     public function test_the_number_of_copies_is_kept_sane(): void

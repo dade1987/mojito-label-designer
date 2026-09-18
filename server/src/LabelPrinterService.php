@@ -221,20 +221,49 @@ final class LabelPrinterService
 
         $copies = max(1, $copies);
 
+        // Le copie partono in un lavoro solo: rimandare la stessa etichetta N
+        // volte fa ripartire la stampante a ogni copia.
         if ($this->resolvePrintMode($data) === self::MODE_GRAPHIC) {
-            $png = $this->renderPng($data);
-            $media = LabelMedia::fromTemplate($this->templateOf($data));
-
-            for ($copy = 0; $copy < $copies; $copy++) {
-                $this->printPng($png, $media);
-            }
+            $this->printPng($this->renderPng($data), LabelMedia::fromTemplate($this->templateOf($data)), $copies);
 
             return;
         }
 
-        $zpl = $this->buildZpl($data);
+        $this->printZpl(str_repeat($this->buildZpl($data), $copies));
+    }
 
-        for ($copy = 0; $copy < $copies; $copy++) {
+    /**
+     * Una serie di etichette (una per pacco, per esempio) in un lavoro solo.
+     *
+     * In ZPL si concatenano i formati, ciascuno ripetuto per le sue copie
+     * (1, 1, 2, 2, ...): la stampante li esegue di fila senza fermarsi.
+     * Le etichette disegnate sono immagini diverse e non si possono unire in
+     * un solo file: partono una per volta, ciascuna con le sue copie in un
+     * lavoro solo.
+     *
+     * @param  list<array<string, mixed>>  $jobs
+     */
+    public function printJobs(array $jobs, int $copies = 1): void
+    {
+        $copies = max(1, $copies);
+
+        if (count($jobs) * $copies > self::MAX_COPIES) {
+            throw new RuntimeException('Troppe etichette richieste: il massimo è '.self::MAX_COPIES.' per stampa.');
+        }
+
+        $zpl = '';
+
+        foreach ($jobs as $data) {
+            if ($this->resolvePrintMode($data) === self::MODE_GRAPHIC) {
+                $this->printPng($this->renderPng($data), LabelMedia::fromTemplate($this->templateOf($data)), $copies);
+
+                continue;
+            }
+
+            $zpl .= str_repeat($this->buildZpl($data), $copies);
+        }
+
+        if ($zpl !== '') {
             $this->printZpl($zpl);
         }
     }
@@ -291,7 +320,7 @@ final class LabelPrinterService
     /**
      * Manda alla coda di stampa un'etichetta già disegnata.
      */
-    public function printPng(string $png, LabelMedia $media): void
+    public function printPng(string $png, LabelMedia $media, int $copies = 1): void
     {
         if (trim($this->printerName) === '') {
             throw new RuntimeException('Nessuna stampante selezionata.');
@@ -315,7 +344,7 @@ final class LabelPrinterService
 
             $errors = [];
 
-            foreach (PrinterPlatform::buildGraphicPrintCommands($this->printerName, $imageFile, $media, $tempDir) as $command) {
+            foreach (PrinterPlatform::buildGraphicPrintCommands($this->printerName, $imageFile, $media, $tempDir, max(1, $copies)) as $command) {
                 $result = $this->commandRunner->run($command);
 
                 if ($result['code'] === 0) {

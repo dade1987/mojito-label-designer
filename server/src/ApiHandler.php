@@ -213,21 +213,20 @@ final class ApiHandler
             return $this->error(500, 'Stampa rifiutata: '.$total.' etichette superano il massimo di '.LabelPrinterService::MAX_COPIES.' per richiesta.');
         }
 
+        // Tutte le etichette della richiesta in un lavoro di stampa solo: uno
+        // per etichetta fa ripartire la stampante ogni volta.
         if (isset($body['zpl']) && is_string($body['zpl']) && $body['zpl'] !== '') {
-            for ($copy = 0; $copy < $copies; $copy++) {
-                $this->service->printZpl($body['zpl']);
-            }
+            $this->service->printZpl(str_repeat($body['zpl'], $copies));
 
             $printed = $copies;
             $mode = LabelPrinterService::MODE_ZPL;
         } else {
             $mode = $this->service->resolvePrintMode($body);
-            $printed = 0;
-
-            foreach ($jobs as $values) {
-                $this->service->printJob(['values' => $values] + $body, $copies);
-                $printed += $copies;
-            }
+            $this->service->printJobs(
+                array_map(static fn (array $values): array => ['values' => $values] + $body, $jobs),
+                $copies
+            );
+            $printed = count($jobs) * $copies;
         }
 
         $payload = [
