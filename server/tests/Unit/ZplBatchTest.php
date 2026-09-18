@@ -59,4 +59,42 @@ final class ZplBatchTest extends TestCase
         $this->assertSame('', ZplBatch::continuous(''));
         $this->assertSame('~JA', ZplBatch::continuous('~JA'));
     }
+
+    /**
+     * La Citizen non supporta ^GF (lo emula, lentamente): in una serie ogni
+     * etichetta la costringe a rielaborare tutte le immagini e la stampante
+     * si ferma ad aspettare. Le immagini si caricano una volta sola in
+     * memoria (~DG) prima della serie e ogni etichetta le richiama (^XG).
+     */
+    public function test_images_of_a_series_are_loaded_once_and_recalled(): void
+    {
+        $label = static fn (string $serial): string => "^XA\n^FO20,15^GFA,4,4,2,F00F0FF0^FS\n^FO20,17^GFA,2,2,2,FFFF^FS\n^FD{$serial}^FS\n^XZ";
+
+        $zpl = ZplBatch::continuous($label('1').$label('2'));
+
+        $first = sprintf('M%07X', crc32('2,F00F0FF0') & 0xFFFFFFF);
+        $second = sprintf('M%07X', crc32('2,FFFF') & 0xFFFFFFF);
+
+        $this->assertSame(
+            "~DGR:{$first}.GRF,4,2,F00F0FF0\n~DGR:{$second}.GRF,2,2,FFFF\n"
+            ."^XA^MMR\n^FO20,15^XGR:{$first}.GRF,1,1^FS\n^FO20,17^XGR:{$second}.GRF,1,1^FS\n^FD1^FS\n^XZ"
+            ."^XA^MMT\n^FO20,15^XGR:{$first}.GRF,1,1^FS\n^FO20,17^XGR:{$second}.GRF,1,1^FS\n^FD2^FS\n^XZ",
+            $zpl
+        );
+    }
+
+    public function test_copies_of_a_label_with_an_image_load_it_once(): void
+    {
+        $zpl = ZplBatch::repeat('^XA^FO0,0^gfa,2,2,2,ffff^FS^XZ', 3);
+
+        $this->assertSame(1, substr_count($zpl, '~DGR:'));
+        $this->assertSame(3, substr_count($zpl, '^XGR:'));
+        $this->assertStringNotContainsStringIgnoringCase('^GFA', $zpl);
+    }
+
+    /** Una etichetta sola resta come sempre: con ^GF la Citizen la stampa. */
+    public function test_a_single_label_keeps_its_images_inline(): void
+    {
+        $this->assertSame('^XA^FO0,0^GFA,2,2,2,FFFF^FS^XZ', ZplBatch::continuous('^XA^FO0,0^GFA,2,2,2,FFFF^FS^XZ'));
+    }
 }

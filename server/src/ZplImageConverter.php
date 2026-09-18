@@ -39,8 +39,6 @@ class ZplImageConverter
             $resized = $this->createResizeCanvas($targetWidth, $targetHeight);
 
             if ($resized === false) {
-                imagedestroy($image);
-
                 return null;
             }
 
@@ -62,7 +60,6 @@ class ZplImageConverter
             $offsetY = intdiv($targetHeight - $drawHeight, 2);
 
             imagecopyresampled($resized, $image, $offsetX, $offsetY, 0, 0, $drawWidth, $drawHeight, $width, $height);
-            imagedestroy($image);
             $image = $resized;
             $width = $targetWidth;
             $height = $targetHeight;
@@ -80,7 +77,6 @@ class ZplImageConverter
             $rotated = imagerotate($image, 360 - $rotation, $blank === false ? 0 : $blank);
 
             if ($rotated !== false) {
-                imagedestroy($image);
                 $image = $rotated;
                 imagesavealpha($image, true);
                 $width = imagesx($image);
@@ -138,8 +134,6 @@ class ZplImageConverter
                 $rowBytes++;
             }
         }
-
-        imagedestroy($image);
 
         $totalBytes = $bytesPerRow * $height;
         $hexData = implode('', $hexLines);

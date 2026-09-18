@@ -42,7 +42,6 @@ final class LabelRasterRenderer
         ob_start();
         imagepng($canvas, null, 9);
         $png = (string) ob_get_clean();
-        imagedestroy($canvas);
 
         return $png;
     }
@@ -229,7 +228,6 @@ final class LabelRasterRenderer
         $scale = max(1, (int) round($fontHeight / imagefontheight(5)));
         $scaled = $this->transparentLayer(imagesx($layer) * $scale, imagesy($layer) * $scale);
         imagecopyresampled($scaled, $layer, 0, 0, 0, 0, imagesx($scaled), imagesy($scaled), imagesx($layer), imagesy($layer));
-        imagedestroy($layer);
 
         $this->stamp($canvas, $scaled, $x, $y, $rotation);
     }
@@ -243,7 +241,6 @@ final class LabelRasterRenderer
         $width = max(1, (int) round(imagesx($layer) * ($fontWidth / $fontHeight)));
         $scaled = $this->transparentLayer($width, imagesy($layer));
         imagecopyresampled($scaled, $layer, 0, 0, 0, 0, $width, imagesy($layer), imagesx($layer), imagesy($layer));
-        imagedestroy($layer);
 
         return $scaled;
     }
@@ -298,7 +295,6 @@ final class LabelRasterRenderer
         $composed = $this->transparentLayer($width, imagesy($bars) + self::BARCODE_TEXT_GAP + $textHeight);
 
         imagecopy($composed, $bars, 0, 0, 0, 0, $width, imagesy($bars));
-        imagedestroy($bars);
 
         $font = LabelFont::regular();
 
@@ -414,7 +410,6 @@ final class LabelRasterRenderer
 
         $resized = $this->transparentLayer($width, $height);
         imagecopyresampled($resized, $source, $offsetX, $offsetY, 0, 0, $drawWidth, $drawHeight, $sourceWidth, $sourceHeight);
-        imagedestroy($source);
 
         // Le termiche stampano solo nero o niente: la soglia è quella scelta
         // nel designer, così l'anteprima e la stampa dicono la stessa cosa.
@@ -472,8 +467,6 @@ final class LabelRasterRenderer
             }
         }
 
-        imagedestroy($image);
-
         return $result;
     }
 
@@ -505,7 +498,6 @@ final class LabelRasterRenderer
             $rotated = imagerotate($layer, 360 - ($rotation % 360), $transparent);
 
             if ($rotated !== false) {
-                imagedestroy($layer);
                 $layer = $rotated;
                 imagealphablending($layer, true);
                 imagesavealpha($layer, true);
@@ -513,7 +505,6 @@ final class LabelRasterRenderer
         }
 
         imagecopy($canvas, $layer, $x, $y, 0, 0, imagesx($layer), imagesy($layer));
-        imagedestroy($layer);
     }
 
     /**

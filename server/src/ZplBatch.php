@@ -15,12 +15,20 @@ namespace Mojito\Label;
  * ritorno). Quindi ^MMR in tutte tranne l'ultima e ^MMT (strappo, il valore
  * di serie) nell'ultima, che si ferma alla barra come sempre e lascia la
  * stampante com'era.
+ *
+ * Le immagini (^GF) vanno caricate una volta sola: la Citizen ^GF non lo
+ * supporta davvero, lo emula rielaborando l'immagine a ogni etichetta, e in
+ * una serie resta indietro e si ferma. In una serie ogni immagine si carica
+ * in memoria con ~DG prima della prima etichetta e ogni etichetta la
+ * richiama con ^XG, che la Citizen supporta.
  */
 final class ZplBatch
 {
     private const CONTINUE = '^MMR';
 
     private const LAST = '^MMT';
+
+    private const GRAPHIC_FIELD = '/\^GFA,\d+,(\d+),(\d+),([0-9A-F]+)/i';
 
     public static function repeat(string $zpl, int $copies): string
     {
@@ -43,6 +51,32 @@ final class ZplBatch
             $result .= $parts[$i].($i === $last ? self::LAST : self::CONTINUE).$parts[$i + 1];
         }
 
-        return $result;
+        return self::storeGraphics($result);
+    }
+
+    /**
+     * Ogni ^GFA diventa un richiamo (^XG) a un'immagine caricata una volta
+     * sola in testa (~DG). Il nome dipende dal contenuto: la stessa immagine
+     * in etichette diverse si carica una volta, e ricaricarla in una serie
+     * successiva la sovrascrive invece di riempire la memoria.
+     */
+    private static function storeGraphics(string $zpl): string
+    {
+        $downloads = [];
+
+        $recalled = preg_replace_callback(self::GRAPHIC_FIELD, static function (array $match) use (&$downloads): string {
+            [, $totalBytes, $bytesPerRow, $data] = $match;
+            $data = strtoupper($data);
+            $name = sprintf('M%07X', crc32($bytesPerRow.','.$data) & 0xFFFFFFF);
+            $downloads[$name] ??= sprintf('~DGR:%s.GRF,%s,%s,%s', $name, $totalBytes, $bytesPerRow, $data);
+
+            return '^XGR:'.$name.'.GRF,1,1';
+        }, $zpl);
+
+        if ($downloads === [] || $recalled === null) {
+            return $zpl;
+        }
+
+        return implode("\n", $downloads)."\n".$recalled;
     }
 }
