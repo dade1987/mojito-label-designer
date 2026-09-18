@@ -39,6 +39,17 @@ import {
 } from '../utils/layoutSaveGuard.js'
 import { resolutionForPrinter, shouldWarnResolution } from '../utils/printerResolution.js'
 import { describePrintMode, printModeForPrinter, shouldWarnPrintMode } from '../utils/printerPrintMode.js'
+import {
+  groupPrinters,
+  loadSavedNetworkPrinters,
+  mergeSavedNetworkPrinters,
+  parseNetworkPrinter,
+  pickDefaultPrinter,
+  printerLabel,
+  printOutcomeMessage,
+  saveNetworkPrinter,
+  zplOnlyModes,
+} from '../utils/printerDestinations.js'
 import { loadPanelSections, savePanelSections } from '../utils/panelSections.js'
 import { printableMagnification, resizeKeepingRatio } from '../utils/aspectRatio.js'
 import {
@@ -87,6 +98,10 @@ const printerResolutions = ref({})
 // Strada di stampa (zpl / graphic) dichiarata dal server per ogni stampante
 // conosciuta: il layout si allinea da solo quando si cambia stampante.
 const printerModes = ref({})
+// I nomi leggibili delle stampanti di rete e dei PC ("SURFACE9 · Citizen").
+const printerLabels = ref({})
+const printerGroups = computed(() => groupPrinters(printers.value, printerLabels.value))
+const selectedPrinterLabel = computed(() => printerLabel(selectedPrinter.value, printerLabels.value))
 // Quali sezioni dei pannelli laterali sono aperte: la scelta resta fra una
 // sessione e l'altra.
 const sections = ref(loadPanelSections())
@@ -295,14 +310,16 @@ onMounted(async () => {
   window.addEventListener('keydown', handleKeydown)
 
   try {
-    const [{ printers: list, platform, diagnostics, printerResolutions: resolutions, printerModes: modes }, defaultTemplate, { templates }] = await Promise.all([
+    const [{ printers: list, platform, diagnostics, printerResolutions: resolutions, printerModes: modes, printerLabels: labels }, defaultTemplate, { templates }] = await Promise.all([
       fetchPrinters(),
       fetchDefaultTemplate(),
       fetchTemplates().catch(() => ({ templates: [] })),
     ])
-    printers.value = Array.isArray(list) ? list : []
+    // Le stampanti del server, piu' quelle di rete aggiunte a mano in questo browser.
+    printers.value = mergeSavedNetworkPrinters(Array.isArray(list) ? list : [], loadSavedNetworkPrinters())
+    printerLabels.value = labels && typeof labels === 'object' ? labels : {}
     printerResolutions.value = resolutions && typeof resolutions === 'object' ? resolutions : {}
-    printerModes.value = modes && typeof modes === 'object' ? modes : {}
+    printerModes.value = { ...zplOnlyModes(printers.value), ...(modes && typeof modes === 'object' ? modes : {}) }
     printerPlatform.value = platform ?? ''
     selectedPrinter.value = pickDefaultPrinter(printers.value)
     if (printers.value.length === 0) {
@@ -336,10 +353,23 @@ watch(
   { deep: true }
 )
 
-function pickDefaultPrinter(list) {
-  if (!list.length) return ''
-  const citizen = list.find((name) => /citizen/i.test(name))
-  return citizen ?? list[0]
+/**
+ * Una stampante ZPL di rete che il server non conosce ancora: il browser la
+ * ricorda, e la stampa la fa il server (con il suo controllo sugli indirizzi).
+ */
+function addNetworkPrinter() {
+  const answer = window.prompt('Indirizzo IP della stampante di rete (es. 192.168.1.50, oppure 192.168.1.50:9100)')
+  if (answer === null) return
+
+  try {
+    const value = parseNetworkPrinter(answer)
+    saveNetworkPrinter(value)
+    if (!printers.value.includes(value)) printers.value = [...printers.value, value]
+    printerModes.value = { ...printerModes.value, ...zplOnlyModes([value]) }
+    selectedPrinter.value = value
+  } catch (error) {
+    showStatus(error.message, 'error')
+  }
 }
 
 function formatPrinterDiagnostics(payload) {
@@ -764,13 +794,13 @@ async function handlePrint() {
 
   try {
     ensurePrinterSelected()
-    await printLabel({
+    const result = await printLabel({
       template: template.value,
       values: dataValues.value,
       printMode: printMode.value,
       printer: selectedPrinter.value,
     })
-    showStatus(`Etichetta inviata a ${selectedPrinter.value}`, 'success')
+    showStatus(printOutcomeMessage(result, selectedPrinterLabel.value, 'Etichetta'), 'success')
   } catch (error) {
     showStatus(error.message, 'error')
   } finally {
@@ -802,7 +832,7 @@ const printModeMismatch = computed(() => shouldWarnPrintMode(printMode.value, pr
 function applyPrinterPrintMode() {
   if (!printerMode.value || !template.value || printMode.value === printerMode.value) return
   printMode.value = printerMode.value
-  showStatus(`${selectedPrinter.value}: layout impostato su ${describePrintMode(printerMode.value)}`, 'info')
+  showStatus(`${selectedPrinterLabel.value}: layout impostato su ${describePrintMode(printerMode.value)}`, 'info')
 }
 
 watch(
@@ -887,7 +917,7 @@ async function handleBatchPrint() {
     const serials = buildSerialRange(batch.value)
     const jobs = buildPrintJobs(serials, batch.value.dataSource)
 
-    await printLabel({
+    const result = await printLabel({
       template: template.value,
       values: dataValues.value,
       jobs,
@@ -897,7 +927,7 @@ async function handleBatchPrint() {
     })
 
     showStatus(
-      `Serie inviata a ${selectedPrinter.value}: ${describeRun(serials.length, batchCopies.value)}`,
+      `${printOutcomeMessage(result, selectedPrinterLabel.value, 'Serie')}: ${describeRun(serials.length, batchCopies.value)}`,
       'success',
     )
   } catch (error) {
@@ -1267,9 +1297,11 @@ function buildApiExample() {
             {{ printerPlatform }}<template v-if="printerMode"> · {{ printerMode === 'graphic' ? 'immagine' : 'ZPL' }}</template>
           </span>
           <select v-if="printers.length" v-model="selectedPrinter">
-            <option v-for="printer in printers" :key="printer" :value="printer">
-              {{ printer }}
-            </option>
+            <optgroup v-for="group in printerGroups" :key="group.title" :label="group.title">
+              <option v-for="printer in group.items" :key="printer.value" :value="printer.value">
+                {{ printer.label }}
+              </option>
+            </optgroup>
           </select>
           <input
             v-else
@@ -1279,6 +1311,16 @@ function buildApiExample() {
             placeholder="Nome stampante Windows/Linux"
           />
         </label>
+
+        <button
+          type="button"
+          class="btn secondary add-network-printer"
+          title="Aggiungi una stampante ZPL di rete per indirizzo IP"
+          :disabled="isBusy"
+          @click="addNetworkPrinter"
+        >
+          + Stampante di rete
+        </button>
 
         <button type="button" class="btn secondary" :disabled="isBusy || !selectedPrinter.trim()" @click="handleQuickPrint">
           Test stampante
