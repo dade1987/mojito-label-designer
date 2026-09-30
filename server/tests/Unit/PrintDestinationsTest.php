@@ -138,8 +138,9 @@ final class PrintDestinationsTest extends TestCase
         $this->assertSame('pc:SURFACE9|Citizen CL-S703', $result['payload']['printer']);
 
         $this->assertCount(1, $this->sent);
-        preg_match_all('/\^FD(CHL\d)\^FS/', $this->sent[0]['zpl'], $matches);
-        $this->assertSame(['CHL1', 'CHL1', 'CHL2', 'CHL2'], $matches[1]);
+        preg_match_all('/\^FD(CHL\d)\^FS.*?\^PQ(\d+)\^XZ/s', $this->sent[0]['zpl'], $matches);
+        $this->assertSame(['CHL1', 'CHL2'], $matches[1]);
+        $this->assertSame(['2', '2'], $matches[2]);
         $this->assertSame(4, $this->sent[0]['labels']);
 
         // Il server non ha stampato niente di suo.
@@ -172,7 +173,7 @@ final class PrintDestinationsTest extends TestCase
             'copies' => 3,
         ]));
 
-        $this->assertSame('^XA^MMR^FDRAW^FS^XZ^XA^MMR^FDRAW^FS^XZ^XA^MMT^FDRAW^FS^XZ', $this->sent[0]['zpl']);
+        $this->assertSame('^XA^FDRAW^FS^PQ3^XZ', $this->sent[0]['zpl']);
         $this->assertSame(3, $this->sent[0]['labels']);
     }
 
@@ -244,10 +245,10 @@ final class PrintDestinationsTest extends TestCase
             ['template' => $this->template(), 'values' => ['serial' => 'B']],
         ], 2);
 
-        preg_match_all('/\^FD([AB])\^FS/', $zpl, $matches);
-        $this->assertSame(['A', 'A', 'B', 'B'], $matches[1]);
-        $this->assertSame(3, substr_count($zpl, '^MMR'));
-        $this->assertSame(1, substr_count($zpl, '^MMT'));
+        preg_match_all('/\^FD([AB])\^FS.*?\^PQ(\d+)\^XZ/s', $zpl, $matches);
+        $this->assertSame(['A', 'B'], $matches[1]);
+        $this->assertSame(['2', '2'], $matches[2]);
+        $this->assertStringNotContainsString('^MM', $zpl);
         $this->assertSame('', $service->buildSeriesZpl([], 3));
     }
 }

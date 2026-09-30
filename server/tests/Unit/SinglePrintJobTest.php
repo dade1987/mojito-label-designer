@@ -68,14 +68,21 @@ final class SinglePrintJobTest extends TestCase
     }
 
     /**
-     * Le etichette escono di fila: nessun ritorno della carta fra l'una e
-     * l'altra (^MMR), strappo solo dopo l'ultima (^MMT).
+     * Le etichette escono di fila senza toccare la modalita' della stampante
+     * (mai ^MM): ogni etichetta e' un formato solo, con le sue copie in ^PQ.
+     *
+     * @param  list<array{string, int}>  $labels  [testo, copie] nell'ordine di stampa
      */
-    private function assertContinuous(string $zpl, int $labels): void
+    private function assertLabels(string $zpl, array $labels): void
     {
-        $this->assertSame($labels - 1, substr_count($zpl, '^XA^MMR'));
-        $this->assertSame(1, substr_count($zpl, '^XA^MMT'));
-        $this->assertStringContainsString('^XA^MMT', substr($zpl, (int) strrpos($zpl, '^XA')));
+        $this->assertStringNotContainsString('^MM', $zpl);
+        $this->assertSame(count($labels), substr_count($zpl, '^XA'));
+
+        preg_match_all('/\^FD([^^]+)\^FS.*?(?:\^PQ(\d+))?\^XZ/s', $zpl, $matches, PREG_SET_ORDER);
+        $this->assertSame(
+            $labels,
+            array_map(static fn (array $m): array => [$m[1], (int) ($m[2] ?? '') ?: 1], $matches)
+        );
     }
 
     private function printCommands(): int
@@ -90,13 +97,12 @@ final class SinglePrintJobTest extends TestCase
         $service->printJob($this->zplJob('CHL1'), 3);
 
         $this->assertSame(1, $this->printCommands());
-        $this->assertSame(3, substr_count($this->payloads[0], '^XA'));
-        $this->assertSame(3, substr_count($this->payloads[0], '^FDCHL1^FS'));
-        $this->assertContinuous($this->payloads[0], 3);
+        $this->assertLabels($this->payloads[0], [['CHL1', 3]]);
     }
 
     /**
-     * Le copie restano accanto alla loro etichetta: 1, 1, 2, 2, 3, 3. Chi
+     * Le copie restano accanto alla loro etichetta: 1, 1, 2, 2, 3, 3 (ognuna
+     * un formato con ^PQ2). Chi
      * attacca le etichette pacco per pacco le trova gia' in ordine.
      */
     public function test_a_series_of_zpl_labels_is_one_print_job_in_order(): void
@@ -106,9 +112,7 @@ final class SinglePrintJobTest extends TestCase
         $service->printJobs([$this->zplJob('CHL1'), $this->zplJob('CHL2'), $this->zplJob('CHL3')], 2);
 
         $this->assertSame(1, $this->printCommands());
-        preg_match_all('/\^FD(CHL\d)\^FS/', $this->payloads[0], $matches);
-        $this->assertSame(['CHL1', 'CHL1', 'CHL2', 'CHL2', 'CHL3', 'CHL3'], $matches[1]);
-        $this->assertContinuous($this->payloads[0], 6);
+        $this->assertLabels($this->payloads[0], [['CHL1', 2], ['CHL2', 2], ['CHL3', 2]]);
     }
 
     public function test_an_empty_series_prints_nothing(): void
@@ -179,8 +183,7 @@ final class SinglePrintJobTest extends TestCase
         $this->assertSame(200, $result['status']);
         $this->assertSame(4, $result['payload']['printed']);
         $this->assertSame(1, $this->printCommands());
-        $this->assertSame(4, substr_count($this->payloads[0], '^XA'));
-        $this->assertContinuous($this->payloads[0], 4);
+        $this->assertLabels($this->payloads[0], [['CHL1', 2], ['CHL2', 2]]);
     }
 
     public function test_the_print_api_sends_copies_of_raw_zpl_as_one_job(): void
@@ -196,6 +199,6 @@ final class SinglePrintJobTest extends TestCase
 
         $this->assertSame(200, $result['status']);
         $this->assertSame(1, $this->printCommands());
-        $this->assertSame('^XA^MMR^FDRAW^FS^XZ^XA^MMR^FDRAW^FS^XZ^XA^MMT^FDRAW^FS^XZ', $this->payloads[0]);
+        $this->assertSame('^XA^FDRAW^FS^PQ3^XZ', $this->payloads[0]);
     }
 }

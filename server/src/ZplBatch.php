@@ -5,16 +5,13 @@ declare(strict_types=1);
 namespace Mojito\Label;
 
 /**
- * Piu' etichette ZPL che escono di fila, senza che la carta torni indietro
- * fra l'una e l'altra.
+ * Piu' etichette ZPL in un lavoro solo, senza mai cambiare la modalita' della
+ * stampante.
  *
- * Dopo ogni formato (^XA...^XZ) la stampante in modalita' strappo porta
- * l'etichetta alla barra e, prima della successiva, riavvolge: la serie esce
- * "una, indietro, un'altra". La Citizen in emulazione ZPL non conosce ^XB,
- * ma accetta ^MMR (tear on: l'etichetta dopo resta sotto la testina, niente
- * ritorno). Quindi ^MMR in tutte tranne l'ultima e ^MMT (strappo, il valore
- * di serie) nell'ultima, che si ferma alla barra come sempre e lascia la
- * stampante com'era.
+ * Niente ^MM (strappo, tear on, ...): la Citizen lo salva, e se una serie si
+ * ferma prima della fine resta nella modalita' cambiata. Le copie della
+ * stessa etichetta diventano invece un formato solo con ^PQ: la stampante le
+ * esegue di fila, senza ritorno della carta fra l'una e l'altra.
  *
  * Le immagini (^GF) vanno caricate una volta sola: la Citizen ^GF non lo
  * supporta davvero, lo emula rielaborando l'immagine a ogni etichetta, e in
@@ -24,11 +21,10 @@ namespace Mojito\Label;
  */
 final class ZplBatch
 {
-    private const CONTINUE = '^MMR';
-
-    private const LAST = '^MMT';
-
     private const GRAPHIC_FIELD = '/\^GFA,\d+,(\d+),(\d+),([0-9A-F]+)/i';
+
+    /** Chi ha gia' una quantita' o numera da se' (con ^PQ avanzerebbe a ogni copia). */
+    private const COUNTS_ON_ITS_OWN = '/\^(PQ|SN|SF)/i';
 
     public static function repeat(string $zpl, int $copies): string
     {
@@ -39,19 +35,44 @@ final class ZplBatch
     {
         $parts = preg_split('/(\^XA)/i', $zpl, -1, PREG_SPLIT_DELIM_CAPTURE);
 
-        // Un formato solo (o nessuno): non c'e' niente da tenere di fila.
+        // Un formato solo (o nessuno): non c'e' niente da mettere di fila.
         if ($parts === false || count($parts) < 5) {
             return $zpl;
         }
 
-        $last = count($parts) - 2;
-        $result = $parts[0];
+        /** @var list<array{string, int}> $formats [formato, copie] */
+        $formats = [];
 
         for ($i = 1; $i < count($parts); $i += 2) {
-            $result .= $parts[$i].($i === $last ? self::LAST : self::CONTINUE).$parts[$i + 1];
+            $format = $parts[$i].$parts[$i + 1];
+            $previous = count($formats) - 1;
+
+            if ($previous >= 0 && $formats[$previous][0] === $format && self::takesQuantity($format)) {
+                $formats[$previous][1]++;
+            } else {
+                $formats[] = [$format, 1];
+            }
         }
 
-        return self::storeGraphics($result);
+        $result = $parts[0].implode('', array_map(
+            static fn (array $format): string => $format[1] > 1 ? self::withQuantity($format[0], $format[1]) : $format[0],
+            $formats
+        ));
+
+        return count($formats) > 1 ? self::storeGraphics($result) : $result;
+    }
+
+    private static function takesQuantity(string $format): bool
+    {
+        return preg_match(self::COUNTS_ON_ITS_OWN, $format) === 0 && stripos($format, '^XZ') !== false;
+    }
+
+    /** ^PQ subito prima dell'ultimo ^XZ del formato. */
+    private static function withQuantity(string $format, int $copies): string
+    {
+        $end = (int) strripos($format, '^XZ');
+
+        return substr($format, 0, $end).'^PQ'.$copies.substr($format, $end);
     }
 
     /**
