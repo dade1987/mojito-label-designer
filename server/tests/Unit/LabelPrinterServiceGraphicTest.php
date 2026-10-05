@@ -49,7 +49,7 @@ final class LabelPrinterServiceGraphicTest extends TestCase
                     ['type' => 'text', 'x' => 10, 'y' => 10, 'fontHeight' => 30, 'fontWidth' => 30, 'dataSource' => 'serial'],
                 ],
             ],
-            'values' => ['serial' => 'CHL12251'],
+            'values' => ['serial' => 'LOT12251'],
         ];
     }
 

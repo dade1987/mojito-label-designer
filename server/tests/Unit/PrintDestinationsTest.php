@@ -127,7 +127,7 @@ final class PrintDestinationsTest extends TestCase
         $result = $this->handler($this->destinations())->handle('POST', '/api/print', (string) json_encode([
             'printer' => 'pc:SURFACE9|Citizen CL-S703',
             'template' => $this->template(),
-            'jobs' => [['serial' => 'CHL1'], ['serial' => 'CHL2']],
+            'jobs' => [['serial' => 'LOT1'], ['serial' => 'LOT2']],
             'copies' => 2,
         ]));
 
@@ -138,8 +138,8 @@ final class PrintDestinationsTest extends TestCase
         $this->assertSame('pc:SURFACE9|Citizen CL-S703', $result['payload']['printer']);
 
         $this->assertCount(1, $this->sent);
-        preg_match_all('/\^FD(CHL\d)\^FS.*?\^PQ(\d+)\^XZ/s', $this->sent[0]['zpl'], $matches);
-        $this->assertSame(['CHL1', 'CHL2'], $matches[1]);
+        preg_match_all('/\^FD(LOT\d)\^FS.*?\^PQ(\d+)\^XZ/s', $this->sent[0]['zpl'], $matches);
+        $this->assertSame(['LOT1', 'LOT2'], $matches[1]);
         $this->assertSame(['2', '2'], $matches[2]);
         $this->assertSame(4, $this->sent[0]['labels']);
 
@@ -157,12 +157,12 @@ final class PrintDestinationsTest extends TestCase
             'printer' => 'ip:192.168.1.50:9100',
             'printMode' => 'graphic',
             'template' => $this->template(),
-            'values' => ['serial' => 'CHL9'],
+            'values' => ['serial' => 'LOT9'],
         ]));
 
         $this->assertSame('printed', $result['payload']['status']);
         $this->assertStringStartsWith('^XA', $this->sent[0]['zpl']);
-        $this->assertStringContainsString('^FDCHL9^FS', $this->sent[0]['zpl']);
+        $this->assertStringContainsString('^FDLOT9^FS', $this->sent[0]['zpl']);
     }
 
     public function test_raw_zpl_with_copies_goes_to_the_destination_in_one_piece(): void
@@ -182,7 +182,7 @@ final class PrintDestinationsTest extends TestCase
         $result = $this->handler($this->destinations())->handle('POST', '/api/print', (string) json_encode([
             'printer' => 'Citizen_CL_S703Z',
             'template' => $this->template(),
-            'values' => ['serial' => 'CHL1'],
+            'values' => ['serial' => 'LOT1'],
         ]));
 
         $this->assertSame('printed', $result['payload']['status']);

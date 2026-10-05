@@ -217,10 +217,10 @@ final class ZplBuilderTest extends TestCase
             ],
         ];
 
-        $zpl = $this->builder->renderTemplate($template, ['sn' => 'CHL134BCL20S08261']);
+        $zpl = $this->builder->renderTemplate($template, ['sn' => 'LOT134ABC20X08261']);
 
         // Il valore passato vince sul default...
-        $this->assertStringContainsString('CHL134BCL20S08261', $zpl);
+        $this->assertStringContainsString('LOT134ABC20X08261', $zpl);
         $this->assertStringNotContainsString('SN-DI-ESEMPIO', $zpl);
         // ...e quello che nessuno ha passato resta come l'ha disegnato chi
         // ha fatto il layout, invece di sparire.

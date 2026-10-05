@@ -3,7 +3,7 @@ export function getCurrentOrigin() {
   return (window.location?.origin || 'http://localhost:8000').replace(/\/+$/, '')
 }
 
-/** Base API: stessa origine del server (GreenEnergy o dev Vite con proxy). */
+/** Base API: stessa origine del server (il gestionale che ospita Mojito, o dev Vite con proxy). */
 export function getApiBaseUrl() {
   const fromEnv = import.meta.env.VITE_API_BASE
   if (fromEnv !== undefined && fromEnv !== '') {

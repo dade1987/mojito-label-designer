@@ -2,7 +2,7 @@
  * ID univoco per elementi/template.
  *
  * `crypto.randomUUID()` esiste SOLO in secure context (HTTPS o localhost):
- * quando l'app è servita da GreenEnergy su http (es. http://server.test)
+ * quando l'app è servita dal gestionale che la ospita su http (es. http://server.test)
  * è `undefined` e lanciava un TypeError, impedendo la creazione degli
  * elementi. `crypto.getRandomValues()` invece è disponibile anche in
  * contesti non sicuri, quindi lo usiamo per comporre un UUID v4 valido.

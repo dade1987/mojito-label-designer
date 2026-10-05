@@ -91,7 +91,7 @@ describe('canvasDisplay', () => {
   })
 
   it('code128Bars produce la larghezza reale in moduli', () => {
-    const { bars, totalModules } = code128Bars('CHL13230Q20S0426')
+    const { bars, totalModules } = code128Bars('LOT13230Q20S0426')
 
     expect(totalModules).toBe(11 * (16 + 2) + 13)
     expect(bars[0]).toEqual({ x: 0, width: 2 })
@@ -108,7 +108,7 @@ describe('canvasDisplay', () => {
   it('computeBarcodeMetrics code128 con riga interpretazione', () => {
     const metrics = computeBarcodeMetrics(
       { id: 'b1', moduleWidth: 2, height: 100 },
-      { b1: 'CHL13230Q20S0426' }
+      { b1: 'LOT13230Q20S0426' }
     )
 
     expect(metrics.widthDots).toBe(211 * 2)

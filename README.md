@@ -114,7 +114,7 @@ printf '^XA^FO50,50^ADN,36,20^FDTEST^FS^XZ' | lp -d ZPL_Printer -o raw
 curl -X POST http://localhost:8080/api/print \
   -H 'Content-Type: application/json' \
   -d '{"templateId":"pacco","printer":"Munbyn_ITPP941P","printMode":"graphic","copies":1,
-       "jobs":[{"serial":"CHL12251"},{"serial":"CHL12252"},{"serial":"CHL12253"}]}'
+       "jobs":[{"serial":"LOT12251"},{"serial":"LOT12252"},{"serial":"LOT12253"}]}'
 ```
 
 **Stampare un layout salvato passando solo i dati variabili:**
@@ -143,8 +143,9 @@ $service->printLabel([
 Mojito nasce come app‑station di un gestionale (Laravel), ma resta un progetto autonomo. Il deploy pubblica la build web e la libreria PHP dentro il server host:
 
 ```bash
-npm run deploy:green-energy   # build + copia in public/stations/apps/mojito/
-                              # poi sul server: composer dump-autoload -o
+MOJITO_HOST_ROOT=../mio-gestionale npm run deploy:host
+# build + copia in public/stations/apps/mojito/ del gestionale
+# poi nel gestionale: composer dump-autoload -o
 ```
 
 L'API Mojito viene servita dalle route del server host (`/api/health`, `/api/print`, …): nessun processo PHP separato in produzione.
@@ -183,5 +184,11 @@ La logica di dominio (manipolazione template, geometria canvas, encoding barcode
 Per l'architettura interna (moduli, classi backend, flusso dati) vedi [`CLAUDE.md`](CLAUDE.md).
 
 ---
+
+## Licenza e autore
+
+Mojito è rilasciato con licenza **GNU AGPL-3.0-or-later** (vedi [`LICENSE`](LICENSE)): puoi usarlo, studiarlo e modificarlo; se lo modifichi e lo offri ad altri in rete, anche le tue modifiche vanno rese pubbliche con la stessa licenza. Per usarlo dentro un prodotto chiuso serve una licenza commerciale: scrivi all'autore.
+
+Autore: **Davide Cavallini**, [cavalliniservice.com](https://cavalliniservice.com) · gestionali su misura, MES e stampa etichette per PMI.
 
 <p align="center"><sub>🍹 Mojito Label Designer · editor ZPL self‑hosted</sub></p>

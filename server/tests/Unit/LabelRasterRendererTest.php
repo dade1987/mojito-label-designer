@@ -112,7 +112,7 @@ final class LabelRasterRendererTest extends TestCase
         ];
 
         $empty = $this->render($template, ['serial' => '']);
-        $filled = $this->render($template, ['serial' => 'CHL134BCL20S0726']);
+        $filled = $this->render($template, ['serial' => 'LOT134ABC20X0726']);
 
         $this->assertSame(0, $this->inkCount($empty['image']));
         $this->assertGreaterThan(0, $this->inkCount($filled['image']));
@@ -146,7 +146,7 @@ final class LabelRasterRendererTest extends TestCase
                     'moduleWidth' => 2,
                     'height' => 100,
                     'showText' => false,
-                    'staticValue' => 'CHL12251',
+                    'staticValue' => 'LOT12251',
                 ],
             ],
         ]);
@@ -180,7 +180,7 @@ final class LabelRasterRendererTest extends TestCase
             'elements' => [
                 [
                     'type' => 'barcode', 'barcodeType' => 'code128', 'x' => 20, 'y' => 40,
-                    'moduleWidth' => 2, 'height' => 100, 'staticValue' => 'CHL12251',
+                    'moduleWidth' => 2, 'height' => 100, 'staticValue' => 'LOT12251',
                     'showText' => true, 'textHeight' => 30,
                 ],
             ],
@@ -210,7 +210,7 @@ final class LabelRasterRendererTest extends TestCase
             'labelWidth' => 400,
             'labelHeight' => 400,
             'elements' => [
-                ['type' => 'qr', 'x' => 50, 'y' => 60, 'magnification' => 6, 'staticValue' => 'CHL134BCL20S07261'],
+                ['type' => 'qr', 'x' => 50, 'y' => 60, 'magnification' => 6, 'staticValue' => 'LOT134ABC20X07261'],
             ],
         ]);
 
@@ -334,7 +334,7 @@ final class LabelRasterRendererTest extends TestCase
 
         $conNulla = $renderer->renderPng(['labelWidth' => 400, 'labelHeight' => 200, 'dpi' => 203, 'elements' => []]);
         $conDefault = $renderer->renderPng($template);
-        $conValore = $renderer->renderPng($template, ['sn' => 'CHL134BCL20S08261']);
+        $conValore = $renderer->renderPng($template, ['sn' => 'LOT134ABC20X08261']);
 
         // Con i default si disegna qualcosa (l'etichetta vuota e' diversa)...
         $this->assertNotSame($conNulla, $conDefault);
