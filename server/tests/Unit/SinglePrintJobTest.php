@@ -94,10 +94,10 @@ final class SinglePrintJobTest extends TestCase
     {
         $service = new LabelPrinterService(commandRunner: $this->runner(), printerName: 'Citizen');
 
-        $service->printJob($this->zplJob('CHL1'), 3);
+        $service->printJob($this->zplJob('LOT1'), 3);
 
         $this->assertSame(1, $this->printCommands());
-        $this->assertLabels($this->payloads[0], [['CHL1', 3]]);
+        $this->assertLabels($this->payloads[0], [['LOT1', 3]]);
     }
 
     /**
@@ -109,10 +109,10 @@ final class SinglePrintJobTest extends TestCase
     {
         $service = new LabelPrinterService(commandRunner: $this->runner(), printerName: 'Citizen');
 
-        $service->printJobs([$this->zplJob('CHL1'), $this->zplJob('CHL2'), $this->zplJob('CHL3')], 2);
+        $service->printJobs([$this->zplJob('LOT1'), $this->zplJob('LOT2'), $this->zplJob('LOT3')], 2);
 
         $this->assertSame(1, $this->printCommands());
-        $this->assertLabels($this->payloads[0], [['CHL1', 2], ['CHL2', 2], ['CHL3', 2]]);
+        $this->assertLabels($this->payloads[0], [['LOT1', 2], ['LOT2', 2], ['LOT3', 2]]);
     }
 
     public function test_an_empty_series_prints_nothing(): void
@@ -140,7 +140,7 @@ final class SinglePrintJobTest extends TestCase
     {
         $service = new LabelPrinterService(commandRunner: $this->runner(), printerName: 'Munbyn_ITPP941P');
 
-        $service->printJob($this->graphicJob('CHL1'), 3);
+        $service->printJob($this->graphicJob('LOT1'), 3);
 
         $this->assertSame(1, $this->printCommands());
         $this->assertStringContainsString(' -n 3 ', $this->commands[0]);
@@ -150,7 +150,7 @@ final class SinglePrintJobTest extends TestCase
     {
         $service = new LabelPrinterService(commandRunner: $this->runner(), printerName: 'Munbyn_ITPP941P');
 
-        $service->printJobs([$this->graphicJob('CHL1'), $this->graphicJob('CHL2')], 2);
+        $service->printJobs([$this->graphicJob('LOT1'), $this->graphicJob('LOT2')], 2);
 
         $this->assertSame(2, $this->printCommands());
         foreach ($this->commands as $command) {
@@ -176,14 +176,14 @@ final class SinglePrintJobTest extends TestCase
         $result = $handler->handle('POST', '/api/print', (string) json_encode([
             'printer' => 'Citizen',
             'template' => $this->zplJob('X')['template'],
-            'jobs' => [['serial' => 'CHL1'], ['serial' => 'CHL2']],
+            'jobs' => [['serial' => 'LOT1'], ['serial' => 'LOT2']],
             'copies' => 2,
         ]));
 
         $this->assertSame(200, $result['status']);
         $this->assertSame(4, $result['payload']['printed']);
         $this->assertSame(1, $this->printCommands());
-        $this->assertLabels($this->payloads[0], [['CHL1', 2], ['CHL2', 2]]);
+        $this->assertLabels($this->payloads[0], [['LOT1', 2], ['LOT2', 2]]);
     }
 
     public function test_the_print_api_sends_copies_of_raw_zpl_as_one_job(): void

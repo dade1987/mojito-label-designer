@@ -10,7 +10,7 @@ A label can be printed two ways, chosen per template (`printMode`):
 - **`zpl`** (default, unchanged): ZPL commands sent RAW — CUPS `lp -o raw` / Windows raw spooling.
 - **`graphic`**: the server *draws* the label into a PNG (`LabelRasterRenderer`, GD) and sends it to the system print queue with the installed driver — CUPS `lp` with a custom media size / Windows `print-image.ps1` (`System.Drawing.Printing`). This is the path for printers that don't speak ZPL (e.g. Munbyn ITPP941P).
 
-It is a standalone project (own git repo) but **deploys into** the `GreenEnergyServer` Laravel app as a station app — see "Deploy" below. `GreenEnergyServer` lives as a sibling directory (`../GreenEnergyServer`) when both repos are checked out side by side.
+It is a standalone project (own git repo) but **deploys into** a host Laravel app as a station app — see "Deploy" below. The host path is given with `MOJITO_HOST_ROOT` (e.g. a sibling directory checked out side by side); its name is never written in this public repository.
 
 - **Frontend**: `src/` — Vue 3 + Vite, optional Electron shell (`electron/`)
 - **Backend**: `server/` — plain PHP 8.2 (no framework), namespace `Mojito\Label\`, generates ZPL and shells out to print it
@@ -44,8 +44,8 @@ npm run validate:full       # + Infection (server) + Stryker (frontend) mutation
 npm run mutation:server     # Infection (server/), needs XDEBUG_MODE=coverage
 npm run mutation            # Stryker (frontend)
 
-# Deploy into GreenEnergyServer
-npm run build:renderer && npm run deploy:green-energy
+# Deploy into the host Laravel app
+MOJITO_HOST_ROOT=../host-app npm run deploy:host
 # then on the server: composer dump-autoload -o
 ```
 
@@ -93,11 +93,11 @@ When printing, the request either carries a `templateId` (server resolves it via
 
 Serial ranges live in `src/utils/serialRange.js` (pure, 100% covered): `buildSerialRange({prefix, start, end, step, pad, suffix})` produces the numbers, `buildPrintJobs()` turns them into the `jobs` payload.
 
-### Frontend/backend integration when embedded in GreenEnergyServer
+### Frontend/backend integration when embedded in the host app
 
-`src/utils/runtime.js` resolves the API base URL as same-origin (`window.location.origin`) unless `VITE_API_BASE` is set — this lets the built assets work both standalone (`server/public` on :8080) and when served from GreenEnergyServer's Laravel routes (`/api/health`, `/api/print`, etc., see `Modules/BatteryModuleA/routes/` in GreenEnergyServer) without a build-time config split.
+`src/utils/runtime.js` resolves the API base URL as same-origin (`window.location.origin`) unless `VITE_API_BASE` is set — this lets the built assets work both standalone (`server/public` on :8080) and when served from the host app's Laravel routes (`/api/health`, `/api/print`, etc.) without a build-time config split.
 
-`scripts/deploy-green-energy.mjs` copies `dist/` → `GreenEnergyServer/public/stations/apps/mojito/`, `server/src/` → `GreenEnergyServer/lib/mojito-label/src/` (self-contained autoload, no dependency back on this repo), and `server/bin/print-raw.ps1` → `GreenEnergyServer/lib/mojito-label/bin/`. `GREEN_ENERGY_ROOT` / `GREEN_ENERGY_MOJITO_DEST` env vars override the default sibling-directory target.
+`scripts/deploy-host.mjs` copies `dist/` → `<host>/public/stations/apps/mojito/`, `server/src/` → `<host>/lib/mojito-label/src/` (self-contained autoload, no dependency back on this repo), `server/bin/*.ps1` → `<host>/lib/mojito-label/bin/` and the fonts. `MOJITO_HOST_ROOT` is required; `MOJITO_HOST_WEB_DEST` overrides the web target.
 
 ## Quality gates
 

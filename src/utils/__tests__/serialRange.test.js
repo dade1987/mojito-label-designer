@@ -25,10 +25,10 @@ describe('serialRange', () => {
   })
 
   it('mette prefisso e suffisso attorno al numero', () => {
-    expect(buildSerialRange({ prefix: 'CHL1225', start: 1, end: 3 })).toEqual([
-      'CHL12251',
-      'CHL12252',
-      'CHL12253',
+    expect(buildSerialRange({ prefix: 'LOT1225', start: 1, end: 3 })).toEqual([
+      'LOT12251',
+      'LOT12252',
+      'LOT12253',
     ])
     expect(buildSerialRange({ start: 1, end: 2, suffix: '-A' })).toEqual(['1-A', '2-A'])
   })

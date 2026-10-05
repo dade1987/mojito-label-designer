@@ -165,7 +165,7 @@ describe('labelFormats', () => {
       ],
     }
 
-    expect(fitElementsToLabel(template, { b: 'CHL13230Q20S0426' })).toBe(true)
+    expect(fitElementsToLabel(template, { b: 'LOT13230Q20S0426' })).toBe(true)
     expect(template.elements[0].moduleWidth).toBe(1)
     expect(template.elements[0].x).toBeLessThan(40)
     expect(template.labelWidth).toBe(400)

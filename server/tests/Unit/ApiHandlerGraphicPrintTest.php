@@ -74,7 +74,7 @@ final class ApiHandlerGraphicPrintTest extends TestCase
     {
         $response = $this->post('/api/label/preview', [
             'template' => $this->template(),
-            'values' => ['serial' => 'CHL12251'],
+            'values' => ['serial' => 'LOT12251'],
         ]);
 
         $this->assertSame(200, $response['status']);
@@ -101,7 +101,7 @@ final class ApiHandlerGraphicPrintTest extends TestCase
         $response = $this->post('/api/print', [
             'printMode' => 'graphic',
             'template' => $this->template(),
-            'values' => ['serial' => 'CHL12251'],
+            'values' => ['serial' => 'LOT12251'],
         ]);
 
         $this->assertSame(200, $response['status']);
@@ -116,7 +116,7 @@ final class ApiHandlerGraphicPrintTest extends TestCase
     {
         $response = $this->post('/api/print', [
             'template' => $this->template(),
-            'values' => ['serial' => 'CHL12251'],
+            'values' => ['serial' => 'LOT12251'],
         ]);
 
         $this->assertSame('zpl', $response['payload']['mode']);
@@ -129,7 +129,7 @@ final class ApiHandlerGraphicPrintTest extends TestCase
             'printMode' => 'graphic',
             'copies' => 3,
             'template' => $this->template(),
-            'values' => ['serial' => 'CHL12251'],
+            'values' => ['serial' => 'LOT12251'],
         ]);
 
         // Tre copie, un solo lavoro di stampa: la coda le stampa di fila.
@@ -143,11 +143,11 @@ final class ApiHandlerGraphicPrintTest extends TestCase
         $response = $this->post('/api/print', [
             'printMode' => 'graphic',
             'template' => $this->template(),
-            'values' => ['lot' => 'CHL1225'],
+            'values' => ['lot' => 'LOT1225'],
             'jobs' => [
-                ['serial' => 'CHL12251'],
-                ['serial' => 'CHL12252'],
-                ['serial' => 'CHL12253'],
+                ['serial' => 'LOT12251'],
+                ['serial' => 'LOT12252'],
+                ['serial' => 'LOT12253'],
             ],
         ]);
 

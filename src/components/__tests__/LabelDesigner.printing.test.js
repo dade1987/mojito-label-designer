@@ -24,7 +24,7 @@ vi.mock('../../utils/api.js', () => ({
     labelHeight: 200,
     dpi: 203,
     dataSources: [
-      { name: 'lotto', label: 'Lotto', defaultValue: 'CHL1225' },
+      { name: 'lotto', label: 'Lotto', defaultValue: 'LOT1225' },
       { name: 'seriale', label: 'Seriale', defaultValue: '1' },
     ],
     elements: [{ id: 'e1', type: 'text', x: 0, y: 0, dataSource: 'seriale' }],
@@ -132,7 +132,7 @@ describe('LabelDesigner — stampa', () => {
 
     await batchInput(wrapper, 'Da').setValue(1)
     await batchInput(wrapper, 'A').setValue(3)
-    await batchInput(wrapper, 'Prefisso').setValue('CHL1225')
+    await batchInput(wrapper, 'Prefisso').setValue('LOT1225')
     await batchInput(wrapper, 'Copie').setValue(2)
 
     await wrapper.findAll('button').find((button) => button.text() === 'Stampa serie').trigger('click')
@@ -141,9 +141,9 @@ describe('LabelDesigner — stampa', () => {
     expect(printCalls).toHaveLength(1)
     expect(printCalls[0].copies).toBe(2)
     expect(printCalls[0].jobs).toEqual([
-      { seriale: 'CHL12251' },
-      { seriale: 'CHL12252' },
-      { seriale: 'CHL12253' },
+      { seriale: 'LOT12251' },
+      { seriale: 'LOT12252' },
+      { seriale: 'LOT12253' },
     ])
   })
 

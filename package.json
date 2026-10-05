@@ -5,9 +5,10 @@
   "type": "module",
   "main": "electron/main.js",
   "author": {
-    "name": "Mojito",
-    "email": "info@mojito.local"
+    "name": "Davide Cavallini",
+    "url": "https://cavalliniservice.com"
   },
+  "license": "AGPL-3.0-or-later",
   "description": "Designer etichette ZPL drag-and-drop, self-hosted",
   "scripts": {
     "dev": "vite",
@@ -15,7 +16,7 @@
     "dev:all": "concurrently \"npm run dev:server\" \"npm run dev\"",
     "dev:electron": "NODE_ENV=development electron .",
     "build:renderer": "vite build",
-    "deploy:green-energy": "npm run build:renderer && node scripts/deploy-green-energy.mjs",
+    "deploy:host": "npm run build:renderer && node scripts/deploy-host.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

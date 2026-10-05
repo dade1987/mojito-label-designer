@@ -102,7 +102,7 @@ describe('layoutStorage', () => {
       printSpeed: 3,
       printMode: 'graphic',
       dataSources: [
-        { name: 'codice_lotto_interno', label: 'Codice lotto interno', defaultValue: 'CHL134BCL20S08261' },
+        { name: 'codice_lotto_interno', label: 'Codice lotto interno', defaultValue: 'LOT134ABC20X08261' },
         { name: 'numero', label: 'Numero', defaultValue: '999' },
       ],
       elements: [

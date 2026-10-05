@@ -5,17 +5,21 @@ import { fileURLToPath } from 'node:url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const rootDir = path.resolve(__dirname, '..')
-const greenEnergyRoot = process.env.GREEN_ENERGY_ROOT
-  ? path.resolve(rootDir, process.env.GREEN_ENERGY_ROOT)
-  : path.resolve(rootDir, '..', 'GreenEnergyServer')
+// Il gestionale Laravel che ospita Mojito come "station": il percorso si da' da fuori,
+// cosi' nel repository non compare il nome dell'installazione.
+//   MOJITO_HOST_ROOT=../mio-gestionale npm run deploy:host
+if (!process.env.MOJITO_HOST_ROOT) {
+  throw new Error('Indica il gestionale che ospita Mojito: MOJITO_HOST_ROOT=../percorso npm run deploy:host')
+}
+const hostRoot = path.resolve(rootDir, process.env.MOJITO_HOST_ROOT)
 
 const webSourceDir = path.join(rootDir, 'dist')
-const webTargetDir = process.env.GREEN_ENERGY_MOJITO_DEST
-  ? path.resolve(rootDir, process.env.GREEN_ENERGY_MOJITO_DEST)
-  : path.join(greenEnergyRoot, 'public', 'stations', 'apps', 'mojito')
+const webTargetDir = process.env.MOJITO_HOST_WEB_DEST
+  ? path.resolve(rootDir, process.env.MOJITO_HOST_WEB_DEST)
+  : path.join(hostRoot, 'public', 'stations', 'apps', 'mojito')
 
 const phpSourceDir = path.join(rootDir, 'server', 'src')
-const phpTargetDir = path.join(greenEnergyRoot, 'lib', 'mojito-label', 'src')
+const phpTargetDir = path.join(hostRoot, 'lib', 'mojito-label', 'src')
 
 try {
   await stat(webSourceDir)
@@ -41,7 +45,7 @@ for (const entry of await readdir(phpTargetDir)) {
 await cp(phpSourceDir, phpTargetDir, { recursive: true })
 console.log(`Mojito PHP deploy: ${phpSourceDir} -> ${phpTargetDir}`)
 
-const psTargetDir = path.join(greenEnergyRoot, 'lib', 'mojito-label', 'bin')
+const psTargetDir = path.join(hostRoot, 'lib', 'mojito-label', 'bin')
 await mkdir(psTargetDir, { recursive: true })
 
 // print-raw.ps1 manda lo ZPL in RAW, print-image.ps1 stampa l'etichetta gia'
@@ -56,9 +60,9 @@ for (const script of ['print-raw.ps1', 'print-image.ps1']) {
 // server ripiega sui font di sistema e le etichette cambiano faccia da una
 // macchina all'altra.
 const fontsSource = path.join(rootDir, 'server', 'resources', 'fonts')
-const fontsTargetDir = path.join(greenEnergyRoot, 'lib', 'mojito-label', 'resources', 'fonts')
+const fontsTargetDir = path.join(hostRoot, 'lib', 'mojito-label', 'resources', 'fonts')
 await mkdir(fontsTargetDir, { recursive: true })
 await cp(fontsSource, fontsTargetDir, { recursive: true })
 console.log(`Mojito font deploy: ${fontsSource} -> ${fontsTargetDir}`)
 
-console.log('Deploy completato. Su GreenEnergyServer esegui: composer dump-autoload -o')
+console.log('Deploy completato. Nel gestionale che ospita Mojito esegui: composer dump-autoload -o')

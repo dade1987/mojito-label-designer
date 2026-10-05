@@ -19,7 +19,7 @@ export const BARCODE_TEXT_FONT_FAMILY =
 
 /**
  * Calibrazione empirica contro Labelary (^A0N,100,100):
- * CG Triumvirate: cap-height 77, campione "CMBGREENENERGY S.R.L." = 1064 dots.
+ * CG Triumvirate: cap-height 77, campione di 21 caratteri maiuscoli (lettere, spazio e punti) = 1064 dots.
  * Roboto Condensed Bold a 100px: cap-height 72, stesso campione = 1057 px,
  * cap top a 0.125em dal bordo superiore della riga (ZPL parte da 0).
  */

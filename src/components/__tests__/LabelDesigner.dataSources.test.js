@@ -117,14 +117,14 @@ describe('LabelDesigner — pannello data source', () => {
     const input = valueInputs(wrapper)[0]
     input.element.focus()
 
-    for (const partial of ['C', 'CH', 'CHL']) {
+    for (const partial of ['C', 'CH', 'LOT']) {
       input.element.value = partial
       await input.trigger('input')
     }
 
     expect(document.activeElement).toBe(input.element)
     expect(input.element.isConnected).toBe(true)
-    expect(wrapper.vm.template.dataSources[0].defaultValue).toBe('CHL')
+    expect(wrapper.vm.template.dataSources[0].defaultValue).toBe('LOT')
 
     wrapper.unmount()
   })

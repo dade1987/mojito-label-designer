@@ -1403,7 +1403,7 @@ function buildApiExample() {
           <div class="inline-fields">
             <label>
               Prefisso
-              <input v-model="batch.prefix" type="text" placeholder="es. CHL1225" />
+              <input v-model="batch.prefix" type="text" placeholder="es. LOT1225" />
             </label>
             <label>
               Suffisso

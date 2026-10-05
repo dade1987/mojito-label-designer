@@ -2,7 +2,7 @@
     "name": "mojito/label-server",
     "description": "Stampa etichette ZPL via CUPS",
     "type": "project",
-    "license": "MIT",
+    "license": "AGPL-3.0-or-later",
     "require": {
         "php": "^8.2",
         "picqer/php-barcode-generator": "^3.2",
