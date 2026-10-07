@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Mojito\Label\Tests\Unit;
 
 use Mojito\Label\ApiHandler;
+use Mojito\Label\LabelMedia;
 use Mojito\Label\LabelPrinterService;
 use Mojito\Label\PrintDestinations;
+use Mojito\Label\PrinterPrintMode;
 use Mojito\Label\ShellCommandRunner;
 use Mojito\Label\TemplateRepository;
 use PHPUnit\Framework\TestCase;
@@ -24,6 +26,9 @@ final class PrintDestinationsTest extends TestCase
 
     /** @var list<array{printer: string, zpl: string, labels: int}> */
     private array $sent = [];
+
+    /** @var list<array{printer: string, pngs: list<string>, media: LabelMedia, copies: int}> */
+    private array $images = [];
 
     protected function tearDown(): void
     {
@@ -45,6 +50,8 @@ final class PrintDestinationsTest extends TestCase
                 return [
                     ['value' => 'ip:192.168.1.50:9100', 'label' => 'Rete · 192.168.1.50:9100'],
                     ['value' => 'pc:SURFACE9|Citizen CL-S703', 'label' => 'SURFACE9 · Citizen CL-S703'],
+                    ['value' => 'pc:UFFICIO|Munbyn ITPP941P', 'label' => 'UFFICIO · Munbyn ITPP941P'],
+                    ['value' => 'pc:UFFICIO|Brother MFC', 'label' => 'UFFICIO · Brother MFC'],
                 ];
             }
 
@@ -53,11 +60,25 @@ final class PrintDestinationsTest extends TestCase
                 return str_starts_with($printer, 'ip:') || str_starts_with($printer, 'pc:');
             }
 
+            public function printMode(string $printer): ?string
+            {
+                return str_starts_with($printer, 'ip:')
+                    ? 'zpl'
+                    : PrinterPrintMode::forPrinter((string) substr($printer, (int) strpos($printer, '|') + 1));
+            }
+
             public function send(string $printer, string $zpl, int $labels): array
             {
                 $this->test->record($printer, $zpl, $labels);
 
                 return ['status' => str_starts_with($printer, 'pc:') ? 'queued' : 'printed'];
+            }
+
+            public function sendImages(string $printer, array $pngs, LabelMedia $media, int $copies): array
+            {
+                $this->test->recordImages($printer, $pngs, $media, $copies);
+
+                return ['status' => 'queued'];
             }
         };
     }
@@ -65,6 +86,14 @@ final class PrintDestinationsTest extends TestCase
     public function record(string $printer, string $zpl, int $labels): void
     {
         $this->sent[] = ['printer' => $printer, 'zpl' => $zpl, 'labels' => $labels];
+    }
+
+    /**
+     * @param  list<string>  $pngs
+     */
+    public function recordImages(string $printer, array $pngs, LabelMedia $media, int $copies): void
+    {
+        $this->images[] = ['printer' => $printer, 'pngs' => $pngs, 'media' => $media, 'copies' => $copies];
     }
 
     private function handler(?PrintDestinations $destinations = null): ApiHandler
@@ -103,11 +132,101 @@ final class PrintDestinationsTest extends TestCase
         $result = $this->handler($this->destinations())->handle('GET', '/api/printers');
 
         $payload = $result['payload'];
-        $this->assertSame(['Citizen_CL_S703Z', 'ip:192.168.1.50:9100', 'pc:SURFACE9|Citizen CL-S703'], $payload['printers']);
+        $this->assertSame(['Citizen_CL_S703Z', 'ip:192.168.1.50:9100', 'pc:SURFACE9|Citizen CL-S703', 'pc:UFFICIO|Munbyn ITPP941P', 'pc:UFFICIO|Brother MFC'], $payload['printers']);
         $this->assertSame('SURFACE9 · Citizen CL-S703', $payload['printerLabels']['pc:SURFACE9|Citizen CL-S703']);
-        // Queste destinazioni ricevono ZPL: il designer imposta il layout di conseguenza.
+        // Ogni destinazione dice come va stampata: il designer imposta il layout di conseguenza.
         $this->assertSame('zpl', $payload['printerModes']['ip:192.168.1.50:9100']);
         $this->assertSame('zpl', $payload['printerModes']['pc:SURFACE9|Citizen CL-S703']);
+        $this->assertSame('graphic', $payload['printerModes']['pc:UFFICIO|Munbyn ITPP941P']);
+        // Un modello che non si riconosce non si inventa: il layout tiene il suo.
+        $this->assertArrayNotHasKey('pc:UFFICIO|Brother MFC', $payload['printerModes']);
+    }
+
+    /**
+     * Una Munbyn lo ZPL non lo capisce: a una destinazione che stampa a
+     * immagine si consegnano le etichette gia' disegnate, una per etichetta,
+     * con la misura e le copie.
+     */
+    public function test_a_series_for_an_image_destination_goes_as_drawn_labels(): void
+    {
+        $result = $this->handler($this->destinations())->handle('POST', '/api/print', (string) json_encode([
+            'printer' => 'pc:UFFICIO|Munbyn ITPP941P',
+            'template' => $this->template(),
+            'jobs' => [['serial' => 'LOT1'], ['serial' => 'LOT2']],
+            'copies' => 2,
+        ]));
+
+        $this->assertSame(200, $result['status']);
+        $this->assertSame('queued', $result['payload']['status']);
+        $this->assertSame('graphic', $result['payload']['mode']);
+        $this->assertSame(4, $result['payload']['printed']);
+        $this->assertSame([], $this->sent);
+
+        $this->assertCount(1, $this->images);
+        $this->assertSame('pc:UFFICIO|Munbyn ITPP941P', $this->images[0]['printer']);
+        $this->assertSame(2, $this->images[0]['copies']);
+        $this->assertCount(2, $this->images[0]['pngs']);
+        $this->assertNotSame($this->images[0]['pngs'][0], $this->images[0]['pngs'][1]);
+        foreach ($this->images[0]['pngs'] as $png) {
+            $this->assertStringStartsWith("\x89PNG", $png);
+        }
+        $this->assertSame(400, $this->images[0]['media']->widthDots());
+        $this->assertSame(200, $this->images[0]['media']->heightDots());
+    }
+
+    /** Uno ZPL scritto a mano resta ZPL, qualunque sia la stampante. */
+    public function test_raw_zpl_to_an_image_destination_stays_zpl(): void
+    {
+        $this->handler($this->destinations())->handle('POST', '/api/print', (string) json_encode([
+            'printer' => 'pc:UFFICIO|Munbyn ITPP941P',
+            'zpl' => '^XA^FDRAW^FS^XZ',
+        ]));
+
+        $this->assertSame('^XA^FDRAW^FS^XZ', $this->sent[0]['zpl']);
+        $this->assertSame([], $this->images);
+    }
+
+    /** Il modello della destinazione conta piu' del layout e della richiesta. */
+    public function test_a_zpl_destination_wins_over_a_graphic_layout(): void
+    {
+        $result = $this->handler($this->destinations())->handle('POST', '/api/print', (string) json_encode([
+            'printer' => 'pc:SURFACE9|Citizen CL-S703',
+            'printMode' => 'graphic',
+            'template' => ['printMode' => 'graphic'] + $this->template(),
+            'values' => ['serial' => 'LOT1'],
+        ]));
+
+        $this->assertSame('zpl', $result['payload']['mode']);
+        $this->assertCount(1, $this->sent);
+        $this->assertSame([], $this->images);
+    }
+
+    /** Su una stampante che non si riconosce decidono la richiesta o il layout. */
+    public function test_an_unknown_destination_follows_the_request_or_the_layout(): void
+    {
+        $handler = $this->handler($this->destinations());
+
+        $handler->handle('POST', '/api/print', (string) json_encode([
+            'printer' => 'pc:UFFICIO|Brother MFC',
+            'template' => ['printMode' => 'graphic'] + $this->template(),
+            'values' => ['serial' => 'LOT1'],
+        ]));
+        $handler->handle('POST', '/api/print', (string) json_encode([
+            'printer' => 'pc:UFFICIO|Brother MFC',
+            'printMode' => 'zpl',
+            'template' => ['printMode' => 'graphic'] + $this->template(),
+            'values' => ['serial' => 'LOT1'],
+        ]));
+        $handler->handle('POST', '/api/print', (string) json_encode([
+            'printer' => 'pc:UFFICIO|Brother MFC',
+            'template' => $this->template(),
+            'values' => ['serial' => 'LOT1'],
+        ]));
+
+        $this->assertCount(1, $this->images);
+        $this->assertCount(1, $this->images[0]['pngs']);
+        $this->assertSame(1, $this->images[0]['copies']);
+        $this->assertCount(2, $this->sent);
     }
 
     public function test_without_extra_destinations_nothing_changes(): void
@@ -148,8 +267,8 @@ final class PrintDestinationsTest extends TestCase
     }
 
     /**
-     * Anche un layout disegnato per una stampante a immagine va in ZPL: quelle
-     * destinazioni ricevono solo ZPL.
+     * Anche un layout disegnato per una stampante a immagine va in ZPL a una
+     * stampante di rete: riceve solo ZPL.
      */
     public function test_a_graphic_layout_is_sent_as_zpl_to_those_destinations(): void
     {
@@ -219,6 +338,16 @@ final class PrintDestinationsTest extends TestCase
             public function handles(string $printer): bool
             {
                 return true;
+            }
+
+            public function printMode(string $printer): ?string
+            {
+                return null;
+            }
+
+            public function sendImages(string $printer, array $pngs, LabelMedia $media, int $copies): array
+            {
+                throw new \LogicException('non usato');
             }
 
             public function send(string $printer, string $zpl, int $labels): array

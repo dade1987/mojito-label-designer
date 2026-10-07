@@ -215,26 +215,9 @@ final class ApiHandler
         }
 
         // Una destinazione offerta da chi ospita Mojito: le si consegna lo ZPL
-        // intero, e la stampa (o la coda) la fa lei.
+        // intero (o le etichette disegnate), e la stampa (o la coda) la fa lei.
         if ($this->destinations !== null && $this->destinations->handles($printer)) {
-            $rawZpl = isset($body['zpl']) && is_string($body['zpl']) && $body['zpl'] !== '' ? $body['zpl'] : null;
-            $zpl = $rawZpl !== null
-                ? ZplBatch::repeat($rawZpl, $copies)
-                : $this->service->buildSeriesZpl(
-                    array_map(static fn (array $values): array => ['values' => $values] + $body, $jobs),
-                    $copies
-                );
-            $labels = $rawZpl !== null ? $copies : count($jobs) * $copies;
-            $result = $this->destinations->send($printer, $zpl, $labels);
-
-            return $this->ok([
-                'status' => $result['status'],
-                'printed' => $labels,
-                'copies' => $copies,
-                'mode' => LabelPrinterService::MODE_ZPL,
-                'printer' => $printer,
-                'method' => 'destination',
-            ]);
+            return $this->printToDestination($this->destinations, $printer, $body, $jobs, $copies);
         }
 
         // Tutte le etichette della richiesta in un lavoro di stampa solo: uno
@@ -270,8 +253,60 @@ final class ApiHandler
     }
 
     /**
+     * @param  array<string, mixed>  $body
+     * @param  list<array<string, mixed>>  $jobs
+     * @return array{status: int, payload: array<string, mixed>}
+     */
+    private function printToDestination(PrintDestinations $destinations, string $printer, array $body, array $jobs, int $copies): array
+    {
+        $rawZpl = isset($body['zpl']) && is_string($body['zpl']) && $body['zpl'] !== '' ? $body['zpl'] : null;
+        $series = array_map(static fn (array $values): array => ['values' => $values] + $body, $jobs);
+
+        if ($rawZpl === null && $this->destinationPrintMode($destinations, $printer, $body) === LabelPrinterService::MODE_GRAPHIC) {
+            $pngs = array_map(fn (array $data): string => $this->service->renderPng($data), $series);
+            $media = LabelMedia::fromTemplate(
+                isset($body['template']) && is_array($body['template']) ? TypeCaster::stringKeyedArray($body['template']) : []
+            );
+            $result = $destinations->sendImages($printer, $pngs, $media, $copies);
+            $labels = count($jobs) * $copies;
+            $mode = LabelPrinterService::MODE_GRAPHIC;
+        } else {
+            $zpl = $rawZpl !== null ? ZplBatch::repeat($rawZpl, $copies) : $this->service->buildSeriesZpl($series, $copies);
+            $labels = $rawZpl !== null ? $copies : count($jobs) * $copies;
+            $result = $destinations->send($printer, $zpl, $labels);
+            $mode = LabelPrinterService::MODE_ZPL;
+        }
+
+        return $this->ok([
+            'status' => $result['status'],
+            'printed' => $labels,
+            'copies' => $copies,
+            'mode' => $mode,
+            'printer' => $printer,
+            'method' => 'destination',
+        ]);
+    }
+
+    /**
+     * Quello che la destinazione sa di se' e' un fatto (una stampante di rete
+     * riceve solo ZPL, una Munbyn solo immagini) e vince; se non lo sa,
+     * decidono la richiesta e poi il layout.
+     *
+     * @param  array<string, mixed>  $body
+     */
+    private function destinationPrintMode(PrintDestinations $destinations, string $printer, array $body): string
+    {
+        $template = isset($body['template']) && is_array($body['template']) ? $body['template'] : [];
+        $mode = $destinations->printMode($printer) ?? $body['printMode'] ?? $template['printMode'] ?? LabelPrinterService::MODE_ZPL;
+
+        return is_string($mode) && strtolower(trim($mode)) === LabelPrinterService::MODE_GRAPHIC
+            ? LabelPrinterService::MODE_GRAPHIC
+            : LabelPrinterService::MODE_ZPL;
+    }
+
+    /**
      * Le stampanti del server, piu' le destinazioni offerte da chi ospita
-     * Mojito, con il nome da mostrare e la modalita' (sempre ZPL).
+     * Mojito, con il nome da mostrare e la modalita', quando si sa.
      *
      * @return array<string, mixed>
      */
@@ -288,7 +323,11 @@ final class ApiHandler
         foreach ($this->destinations->printers() as $destination) {
             $info['printers'][] = $destination['value'];
             $labels[$destination['value']] = $destination['label'];
-            $info['printerModes'][$destination['value']] = LabelPrinterService::MODE_ZPL;
+            $mode = $this->destinations->printMode($destination['value']);
+
+            if ($mode !== null) {
+                $info['printerModes'][$destination['value']] = $mode;
+            }
         }
 
         $info['printerLabels'] = $labels;

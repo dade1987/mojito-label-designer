@@ -118,10 +118,14 @@ export function mergeSavedNetworkPrinters(list, saved) {
   return printers
 }
 
-/** Rete e PC ricevono solo ZPL: il designer imposta il layout di conseguenza. */
+/**
+ * Le stampanti di rete ricevono solo ZPL: il designer imposta il layout di
+ * conseguenza. Quelle dei PC no: una Munbyn stampa a immagine, e il modo lo
+ * dice il server (printerModes).
+ */
 export function zplOnlyModes(list) {
   return Object.fromEntries(
-    list.filter((value) => destinationKind(value) !== 'server').map((value) => [value, 'zpl'])
+    list.filter((value) => destinationKind(value) === 'network').map((value) => [value, 'zpl'])
   )
 }
 

@@ -161,11 +161,14 @@ describe('stampanti di rete ricordate dal browser', () => {
 })
 
 describe('zplOnlyModes', () => {
-  it('rete e PC ricevono solo ZPL', () => {
+  it('solo le stampanti di rete ricevono per forza ZPL', () => {
     expect(zplOnlyModes(['Citizen', 'ip:10.0.0.5:9100', 'pc:SURFACE9|Citizen'])).toEqual({
       'ip:10.0.0.5:9100': 'zpl',
-      'pc:SURFACE9|Citizen': 'zpl',
     })
+  })
+
+  it('le stampanti dei PC seguono quello che dice il server (una Munbyn stampa a immagine)', () => {
+    expect(zplOnlyModes(['pc:UFFICIO|Munbyn ITPP941P'])).toEqual({})
   })
 })
 
