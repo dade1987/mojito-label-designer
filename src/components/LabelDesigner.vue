@@ -54,8 +54,8 @@ import { loadPanelSections, savePanelSections } from '../utils/panelSections.js'
 import { printableMagnification, resizeKeepingRatio } from '../utils/aspectRatio.js'
 import {
   MAX_LABELS_PER_RUN,
-  buildPrintJobs,
-  buildSerialRange,
+  buildSeriesJobs,
+  normalizeSeriesSettings,
   describeRun,
   serialRangeCount,
 } from '../utils/serialRange.js'
@@ -115,14 +115,11 @@ const zplPreview = ref('')
 const labelImagePreview = ref('')
 // La stampa manuale a serie: una tirata di etichette numerate, senza dover
 // cambiare a mano il valore e ripremere Stampa per ogni pezzo.
+// Da, A e copie cambiano a ogni stampa; campi, prefisso, zeri e passo
+// stanno nel layout (template.series) e si salvano con lui.
 const batch = ref({
-  dataSource: '',
   start: 1,
   end: 10,
-  step: 1,
-  pad: 0,
-  prefix: '',
-  suffix: '',
   copies: 1,
 })
 const statusMessage = ref('')
@@ -396,6 +393,7 @@ function hydrateTemplate(raw) {
       defaultValue: source.defaultValue ?? '',
     })),
     elements: cloneTemplateState(raw.elements ?? []),
+    series: normalizeSeriesSettings(raw.series),
   }
 }
 
@@ -849,20 +847,34 @@ function toggleSection(key, event) {
 
 const batchCopies = computed(() => Math.max(1, Number(batch.value.copies) || 1))
 
-const batchCount = computed(() => serialRangeCount(batch.value))
+// Ogni layout ha le sue impostazioni di serie, anche quelli nuovi o vecchi.
+watch(
+  template,
+  (current) => {
+    if (current && !current.series) current.series = normalizeSeriesSettings()
+  },
+  { immediate: true, flush: 'sync' },
+)
+
+const seriesRange = computed(() => ({ ...normalizeSeriesSettings(template.value?.series), ...batch.value }))
+
+const batchCount = computed(() => serialRangeCount(seriesRange.value))
 
 const batchSummary = computed(() => describeRun(batchCount.value, batchCopies.value))
 
-/** I primi e l'ultimo numero di serie, per far vedere cosa uscirà davvero. */
+/** Le prime e l'ultima etichetta, per far vedere cosa uscirà davvero. */
 const batchSample = computed(() => {
   try {
-    const serials = buildSerialRange(batch.value)
+    const { codeField, numberField } = seriesRange.value
+    const labels = buildSeriesJobs(seriesRange.value, seriesRange.value).map((job) =>
+      numberField ? `${job[codeField]} (${job[numberField]})` : job[codeField],
+    )
 
-    if (serials.length <= 4) {
-      return serials.join(', ')
+    if (labels.length <= 4) {
+      return labels.join(', ')
     }
 
-    return `${serials.slice(0, 3).join(', ')} … ${serials[serials.length - 1]}`
+    return `${labels.slice(0, 3).join(', ')} … ${labels[labels.length - 1]}`
   } catch {
     return ''
   }
@@ -872,11 +884,11 @@ const batchSample = computed(() => {
  * La sorgente dati che riceve il numero di serie: si sceglie da sola quella
  * che ne ha l'aria, così la stampa a serie è pronta appena si apre il layout.
  */
-function pickBatchDataSource(sources) {
+function pickBatchDataSource(sources, current) {
   const names = (sources ?? []).map((source) => source.name)
 
-  if (names.includes(batch.value.dataSource)) {
-    return batch.value.dataSource
+  if (names.includes(current)) {
+    return current
   }
 
   const likely = names.find((name) =>
@@ -889,7 +901,11 @@ function pickBatchDataSource(sources) {
 watch(
   () => template.value?.dataSources,
   (sources) => {
-    batch.value.dataSource = pickBatchDataSource(sources)
+    const series = template.value?.series
+    if (!series) return
+    series.codeField = pickBatchDataSource(sources, series.codeField)
+    // il campo del solo numero non si indovina: resta quello scelto, se c'è ancora
+    if (!(sources ?? []).some((source) => source.name === series.numberField)) series.numberField = ''
   },
   { deep: true, immediate: true },
 )
@@ -898,7 +914,7 @@ const canPrintBatch = computed(
   () =>
     !isBusy.value &&
     Boolean(selectedPrinter.value.trim()) &&
-    Boolean(batch.value.dataSource) &&
+    Boolean(seriesRange.value.codeField) &&
     batchCount.value > 0 &&
     batchCount.value <= MAX_LABELS_PER_RUN,
 )
@@ -914,8 +930,7 @@ async function handleBatchPrint() {
 
   try {
     ensurePrinterSelected()
-    const serials = buildSerialRange(batch.value)
-    const jobs = buildPrintJobs(serials, batch.value.dataSource)
+    const jobs = buildSeriesJobs(seriesRange.value, seriesRange.value)
 
     const result = await printLabel({
       template: template.value,
@@ -927,7 +942,7 @@ async function handleBatchPrint() {
     })
 
     showStatus(
-      `${printOutcomeMessage(result, selectedPrinterLabel.value, 'Serie')}: ${describeRun(serials.length, batchCopies.value)}`,
+      `${printOutcomeMessage(result, selectedPrinterLabel.value, 'Serie')}: ${describeRun(jobs.length, batchCopies.value)}`,
       'success',
     )
   } catch (error) {
@@ -1373,9 +1388,22 @@ function buildApiExample() {
         <summary>Stampa manuale</summary>
         <div class="batch-panel">
           <label>
-            Numero di serie nel campo
-            <select v-model="batch.dataSource">
+            Codice completo nel campo
+            <select v-model="template.series.codeField">
               <option v-for="source in template.dataSources" :key="source.name" :value="source.name">
+                {{ source.label ?? source.name }}
+              </option>
+            </select>
+          </label>
+          <label>
+            Solo il numero nel campo
+            <select v-model="template.series.numberField">
+              <option value="">— nessuno —</option>
+              <option
+                v-for="source in template.dataSources.filter((item) => item.name !== template.series.codeField)"
+                :key="source.name"
+                :value="source.name"
+              >
                 {{ source.label ?? source.name }}
               </option>
             </select>
@@ -1393,21 +1421,21 @@ function buildApiExample() {
           <div class="inline-fields">
             <label>
               Passo
-              <input v-model.number="batch.step" type="number" min="1" step="1" />
+              <input v-model.number="template.series.step" type="number" min="1" step="1" />
             </label>
             <label>
               Cifre (zeri davanti)
-              <input v-model.number="batch.pad" type="number" min="0" max="12" step="1" />
+              <input v-model.number="template.series.pad" type="number" min="0" max="12" step="1" />
             </label>
           </div>
           <div class="inline-fields">
             <label>
               Prefisso
-              <input v-model="batch.prefix" type="text" placeholder="es. LOT1225" />
+              <input v-model="template.series.prefix" type="text" placeholder="es. CTW10140T20S0926" />
             </label>
             <label>
               Suffisso
-              <input v-model="batch.suffix" type="text" />
+              <input v-model="template.series.suffix" type="text" />
             </label>
           </div>
           <label>
@@ -1419,6 +1447,7 @@ function buildApiExample() {
             <strong>{{ batchSummary }}</strong>
             <template v-if="batchSample"><br />{{ batchSample }}</template>
           </p>
+          <p class="hint">Campi, prefisso e zeri si salvano con il layout.</p>
           <p v-if="batchCount > MAX_LABELS_PER_RUN" class="hint warn-box">
             Troppe etichette in una volta: il massimo è {{ MAX_LABELS_PER_RUN }}.
           </p>

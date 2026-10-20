@@ -27,7 +27,10 @@ vi.mock('../../utils/api.js', () => ({
       { name: 'lotto', label: 'Lotto', defaultValue: 'LOT1225' },
       { name: 'seriale', label: 'Seriale', defaultValue: '1' },
     ],
-    elements: [{ id: 'e1', type: 'text', x: 0, y: 0, dataSource: 'seriale' }],
+    elements: [
+      { id: 'e1', type: 'text', x: 0, y: 0, dataSource: 'seriale' },
+      { id: 'e2', type: 'barcode', x: 0, y: 40, dataSource: 'lotto' },
+    ],
   }),
   fetchTemplates: async () => ({ templates: [] }),
   fetchTemplate: async () => null,
@@ -114,7 +117,8 @@ describe('LabelDesigner — stampa', () => {
   it('sceglie da sola una sorgente dati sensata per il numero di serie', async () => {
     const wrapper = await mountDesigner()
 
-    expect(wrapper.vm.batch.dataSource).toBe('seriale')
+    expect(wrapper.vm.template.series.codeField).toBe('seriale')
+    expect(wrapper.vm.template.series.numberField).toBe('')
   })
 
   it('riassume quante etichette partiranno prima di stamparle', async () => {
@@ -145,6 +149,44 @@ describe('LabelDesigner — stampa', () => {
       { seriale: 'LOT12252' },
       { seriale: 'LOT12253' },
     ])
+  })
+
+  /**
+   * Etichette piccole (#43): il QR porta il codice completo, il testo solo il
+   * numero; prefisso e campi restano nel layout e partono col salvataggio.
+   */
+  it('stampa il codice completo in un campo e il solo numero nell\'altro', async () => {
+    const wrapper = await mountDesigner()
+
+    const fields = wrapper.findAll('.batch-panel select')
+    await fields[0].setValue('lotto')
+    await fields[1].setValue('seriale')
+    // il campo del codice non si offre come campo del solo numero
+    expect(fields[1].findAll('option').map((option) => option.attributes('value'))).toEqual(['', 'seriale'])
+
+    await batchInput(wrapper, 'Da').setValue(110)
+    await batchInput(wrapper, 'A').setValue(111)
+    await batchInput(wrapper, 'Prefisso').setValue('CTW10140T20S0926')
+
+    expect(wrapper.find('.batch-panel').text()).toContain('CTW10140T20S0926110 (110), CTW10140T20S0926111 (111)')
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Stampa serie').trigger('click')
+    await flushPromises()
+
+    expect(printCalls[0].jobs).toEqual([
+      { lotto: 'CTW10140T20S0926110', seriale: '110' },
+      { lotto: 'CTW10140T20S0926111', seriale: '111' },
+    ])
+    expect(wrapper.vm.template.series).toMatchObject({ codeField: 'lotto', numberField: 'seriale', prefix: 'CTW10140T20S0926' })
+  })
+
+  it('se il campo del solo numero sparisce dal layout, la scelta si azzera', async () => {
+    const wrapper = await mountDesigner()
+    wrapper.vm.template.series.numberField = 'lotto'
+    wrapper.vm.template.dataSources = wrapper.vm.template.dataSources.filter((source) => source.name !== 'lotto')
+    await flushPromises()
+
+    expect(wrapper.vm.template.series.numberField).toBe('')
   })
 
   it('non lascia stampare un intervallo al contrario', async () => {
