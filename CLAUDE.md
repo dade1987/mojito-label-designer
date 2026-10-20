@@ -97,7 +97,7 @@ Serial ranges live in `src/utils/serialRange.js` (pure, 100% covered): `buildSer
 
 `src/utils/runtime.js` resolves the API base URL as same-origin (`window.location.origin`) unless `VITE_API_BASE` is set — this lets the built assets work both standalone (`server/public` on :8080) and when served from the host app's Laravel routes (`/api/health`, `/api/print`, etc.) without a build-time config split.
 
-`scripts/deploy-host.mjs` copies `dist/` → `<host>/public/stations/apps/mojito/`, `server/src/` → `<host>/lib/mojito-label/src/` (self-contained autoload, no dependency back on this repo), `server/bin/*.ps1` → `<host>/lib/mojito-label/bin/` and the fonts. `MOJITO_HOST_ROOT` is required; `MOJITO_HOST_WEB_DEST` overrides the web target.
+`npm run deploy:host` builds with an absolute base (`build:host` → `dist-host/`, base `/stations/apps/mojito/`; Electron keeps `base './'` via `build:renderer`). `scripts/deploy-host.mjs` copies the assets → `<host>/public/stations/apps/mojito/`, moves `index.html` to `<host>/resources/stations/mojito/index.html` (the host serves it at `/mojito`, admins only) and leaves a redirect stub to `/mojito` in the public folder. Inside the host the API runs on the admin's session: `src/utils/api.js` sends `Accept: application/json`, `credentials: 'same-origin'` and the decoded `XSRF-TOKEN` cookie as `X-XSRF-TOKEN`, and on a 401 carrying `loginUrl` goes there. It also copies `server/src/` → `<host>/lib/mojito-label/src/` (self-contained autoload, no dependency back on this repo), `server/bin/*.ps1` → `<host>/lib/mojito-label/bin/` and the fonts. `MOJITO_HOST_ROOT` is required; `MOJITO_HOST_WEB_DEST` overrides the web target.
 
 ## Quality gates
 

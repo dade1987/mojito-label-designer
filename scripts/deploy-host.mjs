@@ -1,4 +1,4 @@
-import { cp, mkdir, readdir, rm, stat } from 'node:fs/promises'
+import { cp, mkdir, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -13,10 +13,27 @@ if (!process.env.MOJITO_HOST_ROOT) {
 }
 const hostRoot = path.resolve(rootDir, process.env.MOJITO_HOST_ROOT)
 
-const webSourceDir = path.join(rootDir, 'dist')
+// Build con percorsi assoluti (npm run build:host): la pagina del designer la
+// serve il gestionale da un altro indirizzo, gli asset restano qui sotto.
+const webSourceDir = path.join(rootDir, 'dist-host')
 const webTargetDir = process.env.MOJITO_HOST_WEB_DEST
   ? path.resolve(rootDir, process.env.MOJITO_HOST_WEB_DEST)
   : path.join(hostRoot, 'public', 'stations', 'apps', 'mojito')
+
+// La pagina vera la serve il gestionale solo a chi ha il permesso; nella
+// cartella pubblica resta un rimando, cosi' i vecchi link portano al login.
+const shellTargetDir = path.join(hostRoot, 'resources', 'stations', 'mojito')
+const hostAppUrl = '/mojito'
+const redirectStub = `<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="0; url=${hostAppUrl}">
+<title>Mojito - Label Designer</title>
+</head>
+<body><a href="${hostAppUrl}">Apri Mojito</a></body>
+</html>
+`
 
 const phpSourceDir = path.join(rootDir, 'server', 'src')
 const phpTargetDir = path.join(hostRoot, 'lib', 'mojito-label', 'src')
@@ -24,7 +41,7 @@ const phpTargetDir = path.join(hostRoot, 'lib', 'mojito-label', 'src')
 try {
   await stat(webSourceDir)
 } catch {
-  throw new Error(`Build non trovata in ${webSourceDir}. Esegui prima npm run build:renderer.`)
+  throw new Error(`Build non trovata in ${webSourceDir}. Esegui prima npm run build:host.`)
 }
 
 await mkdir(webTargetDir, { recursive: true })
@@ -34,7 +51,10 @@ for (const entry of await readdir(webTargetDir)) {
 }
 
 await cp(webSourceDir, webTargetDir, { recursive: true })
-console.log(`Mojito web deploy: ${webSourceDir} -> ${webTargetDir}`)
+await mkdir(shellTargetDir, { recursive: true })
+await rename(path.join(webTargetDir, 'index.html'), path.join(shellTargetDir, 'index.html'))
+await writeFile(path.join(webTargetDir, 'index.html'), redirectStub)
+console.log(`Mojito web deploy: ${webSourceDir} -> ${webTargetDir} (pagina in ${shellTargetDir})`)
 
 await mkdir(phpTargetDir, { recursive: true })
 

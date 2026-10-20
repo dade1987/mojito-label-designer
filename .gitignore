@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-host/
 coverage/
 server/vendor/
 server/storage/phpstan/
