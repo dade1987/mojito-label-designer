@@ -202,3 +202,126 @@ describe('api', () => {
     expect(fetchSpy.mock.calls[0][1].method).toBe('POST')
   })
 })
+
+/**
+ * Dentro il gestionale le API passano dalla sessione dell'amministratore:
+ * il designer manda il cookie di sessione, il token anti-CSRF di Laravel
+ * (cookie XSRF-TOKEN, decodificato, letto a ogni richiesta) e chiede JSON,
+ * cosi' gli errori di accesso tornano come JSON e non come pagina HTML.
+ */
+describe('api dentro il gestionale', () => {
+  const clearCookie = () => {
+    document.cookie = 'XSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
+  }
+
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    sessionStorage.clear()
+    clearCookie()
+  })
+
+  it('chiede JSON e manda il cookie di sessione', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true, json: async () => ({}) })
+
+    await fetchPrinters()
+
+    const options = fetchSpy.mock.calls[0][1]
+    expect(options.credentials).toBe('same-origin')
+    expect(options.headers.Accept).toBe('application/json')
+    expect(options.headers).not.toHaveProperty('X-XSRF-TOKEN')
+  })
+
+  it('manda il token anti-CSRF decodificato, riletto a ogni richiesta', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true, json: async () => ({}) })
+
+    document.cookie = 'altro=1; path=/'
+    document.cookie = 'XSRF-TOKEN=abc%3D%3D; path=/'
+    await printLabel({ a: 1 })
+    expect(fetchSpy.mock.calls[0][1].headers['X-XSRF-TOKEN']).toBe('abc==')
+
+    document.cookie = 'XSRF-TOKEN=nuovo; path=/'
+    await printLabel({ a: 1 })
+    expect(fetchSpy.mock.calls[1][1].headers['X-XSRF-TOKEN']).toBe('nuovo')
+  })
+
+  it('un cookie malformato non blocca la richiesta', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true, json: async () => ({}) })
+    document.cookie = 'XSRF-TOKEN=%E0%A4%A; path=/'
+
+    await fetchPrinters()
+
+    expect(fetchSpy.mock.calls[0][1].headers).not.toHaveProperty('X-XSRF-TOKEN')
+  })
+
+  it('senza document il token non c\'e\' e la richiesta parte lo stesso', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true, json: async () => ({}) })
+    vi.stubGlobal('document', undefined)
+
+    try {
+      await fetchPrinters()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+
+    expect(fetchSpy.mock.calls[0][1].headers).not.toHaveProperty('X-XSRF-TOKEN')
+  })
+
+  it('le intestazioni passate dal chiamante si aggiungono, non sostituiscono', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true, json: async () => ({}) })
+    vi.resetModules()
+    const fresh = await import('../api.js')
+
+    await fresh.request('/api/health', { headers: { 'X-Prova': '1' } })
+
+    const headers = fetchSpy.mock.calls[0][1].headers
+    expect(headers['X-Prova']).toBe('1')
+    expect(headers['Content-Type']).toBe('application/json')
+    expect(headers.Accept).toBe('application/json')
+  })
+
+  it('usa il messaggio di Laravel quando manca "error"', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 419,
+      json: async () => ({ message: 'CSRF token mismatch.' }),
+    })
+
+    await expect(fetchPrinters()).rejects.toMatchObject({ status: 419, message: 'CSRF token mismatch.' })
+  })
+
+  it('sessione scaduta: porta alla pagina di accesso indicata dal server', async () => {
+    const assign = vi.fn()
+    vi.stubGlobal('location', { ...window.location, origin: window.location.origin, assign })
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: 'Accesso richiesto', loginUrl: 'http://server.test/mojito' }),
+    })
+
+    try {
+      await expect(fetchPrinters()).rejects.toMatchObject({ status: 401, message: 'Accesso richiesto' })
+    } finally {
+      vi.unstubAllGlobals()
+    }
+
+    expect(assign).toHaveBeenCalledWith('http://server.test/mojito')
+  })
+
+  it('un 401 senza indirizzo (password del designer errata) non cambia pagina', async () => {
+    const assign = vi.fn()
+    vi.stubGlobal('location', { ...window.location, origin: window.location.origin, assign })
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: 'Password errata' }),
+    })
+
+    try {
+      await expect(checkPassword('x')).rejects.toMatchObject({ status: 401 })
+    } finally {
+      vi.unstubAllGlobals()
+    }
+
+    expect(assign).not.toHaveBeenCalled()
+  })
+})

@@ -14,20 +14,42 @@ function resolveBaseUrl() {
   return ''
 }
 
-async function request(path, options = {}) {
+/**
+ * Il token anti-CSRF che Laravel lascia nel cookie XSRF-TOKEN (codificato).
+ * Si rilegge a ogni richiesta: dopo un nuovo accesso il token cambia.
+ */
+function xsrfToken() {
+  try {
+    const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]*)/)
+    return match ? decodeURIComponent(match[1]) : ''
+  } catch {
+    return ''
+  }
+}
+
+export async function request(path, options = {}) {
+  const token = xsrfToken()
   const response = await fetch(`${resolveBaseUrl()}${path}`, {
+    ...options,
+    credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(token === '' ? {} : { 'X-XSRF-TOKEN': token }),
       ...authHeaders(),
       ...(options.headers ?? {}),
     },
-    ...options,
   })
 
   const payload = await response.json().catch(() => ({}))
 
   if (!response.ok) {
-    const error = new Error(payload.error ?? `Errore HTTP ${response.status}`)
+    // Sessione del gestionale scaduta: il server dice dove rientrare.
+    if (response.status === 401 && typeof payload.loginUrl === 'string') {
+      globalThis.location.assign(payload.loginUrl)
+    }
+
+    const error = new Error(payload.error ?? payload.message ?? `Errore HTTP ${response.status}`)
     error.status = response.status
     throw error
   }
