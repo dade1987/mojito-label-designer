@@ -9,6 +9,7 @@ import LabelDesigner from '../LabelDesigner.vue'
  */
 
 const printCalls = []
+const stopCalls = []
 const imagePreviewCalls = []
 
 vi.mock('../../utils/api.js', () => ({
@@ -47,6 +48,12 @@ vi.mock('../../utils/api.js', () => ({
 
     return {}
   },
+  stopPrinting: async (printer) => {
+    stopCalls.push(printer)
+    if (printer === 'rotta') throw new Error('Stampante non raggiungibile')
+
+    return { status: 'stopped', message: `Stop inviato a ${printer}` }
+  },
   fetchAuthStatus: async () => ({ passwordRequired: false, authenticated: true }),
   checkPassword: async () => ({}),
 }))
@@ -76,6 +83,7 @@ describe('LabelDesigner — stampa', () => {
     localStorage.clear()
     sessionStorage.clear()
     printCalls.length = 0
+    stopCalls.length = 0
     imagePreviewCalls.length = 0
   })
 
@@ -198,5 +206,40 @@ describe('LabelDesigner — stampa', () => {
     const button = wrapper.findAll('button').find((node) => node.text() === 'Stampa serie')
     expect(button.attributes('disabled')).toBeDefined()
     expect(wrapper.find('.batch-panel .hint').text()).toContain('nessuna etichetta')
+  })
+
+  /**
+   * "Ferma stampa" (#39): ferma la stampante scelta, anche mentre la serie
+   * sta ancora partendo (non aspetta la fine della richiesta), senza conferme.
+   */
+  it('Ferma stampa ferma la stampante scelta e dice cosa ha fatto', async () => {
+    const wrapper = await mountDesigner()
+    const stopButtons = () => wrapper.findAll('button').filter((button) => button.text() === 'Ferma stampa')
+    expect(stopButtons().length).toBe(2) // in alto e nella stampa manuale
+
+    wrapper.vm.isBusy = true
+    await flushPromises()
+    expect(stopButtons()[0].attributes('disabled')).toBeUndefined()
+
+    await stopButtons()[1].trigger('click')
+    await flushPromises()
+
+    expect(stopCalls).toEqual([wrapper.vm.selectedPrinter])
+    expect(wrapper.text()).toContain(`Stop inviato a ${wrapper.vm.selectedPrinter}`)
+  })
+
+  it('senza stampante scelta Ferma stampa non si preme, e un errore si legge', async () => {
+    const wrapper = await mountDesigner()
+    const stopButton = () => wrapper.findAll('button').find((button) => button.text() === 'Ferma stampa')
+
+    wrapper.vm.selectedPrinter = ''
+    await flushPromises()
+    expect(stopButton().attributes('disabled')).toBeDefined()
+
+    wrapper.vm.selectedPrinter = 'rotta'
+    await flushPromises()
+    await stopButton().trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Stampante non raggiungibile')
   })
 })

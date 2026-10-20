@@ -11,6 +11,7 @@ import {
   previewZpl,
   printLabel,
   saveTemplate,
+  stopPrinting,
 } from '../api.js'
 
 describe('api', () => {
@@ -143,6 +144,7 @@ describe('api', () => {
       [() => previewZpl({ a: 1 }), '/api/zpl/preview', 'POST'],
       [() => previewLabelImage({ a: 1 }), '/api/label/preview', 'POST'],
       [() => printLabel({ a: 1 }), '/api/print', 'POST'],
+      [() => stopPrinting('Citizen'), '/api/print/stop', 'POST'],
     ]
 
     for (const [call, path, method] of cases) {
@@ -323,5 +325,15 @@ describe('api dentro il gestionale', () => {
     }
 
     expect(assign).not.toHaveBeenCalled()
+  })
+})
+
+describe('stopPrinting', () => {
+  it('chiede di fermare solo la stampante scelta', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true, json: async () => ({ status: 'stopped' }) })
+
+    await stopPrinting('pc:SURFACE9|Citizen CL-S703')
+
+    expect(JSON.parse(fetchSpy.mock.calls[0][1].body)).toEqual({ printer: 'pc:SURFACE9|Citizen CL-S703' })
   })
 })

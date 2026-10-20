@@ -8,6 +8,7 @@ import {
   previewLabelImage,
   previewZpl,
   printLabel,
+  stopPrinting,
   saveTemplate,
   deleteTemplate,
 } from '../utils/api.js'
@@ -952,6 +953,22 @@ async function handleBatchPrint() {
   }
 }
 
+/**
+ * "Ferma stampa": non aspetta la serie in partenza (non guarda isBusy) e non
+ * chiede conferma, chi lo preme ha fretta.
+ */
+async function handleStop() {
+  const printer = selectedPrinter.value.trim()
+  if (!printer) return
+
+  try {
+    const result = await stopPrinting(printer)
+    showStatus(result.message || `Stop inviato a ${selectedPrinterLabel.value}`, result.status === 'unsupported' ? 'error' : 'success')
+  } catch (error) {
+    showStatus(error.message, 'error')
+  }
+}
+
 async function handleQuickPrint() {
   isBusy.value = true
 
@@ -1343,6 +1360,9 @@ function buildApiExample() {
         <button type="button" class="btn primary" :disabled="isBusy || !selectedPrinter.trim()" @click="handlePrint">
           Stampa etichetta
         </button>
+        <button type="button" class="btn danger" :disabled="!selectedPrinter.trim()" @click="handleStop">
+          Ferma stampa
+        </button>
       </div>
     </header>
 
@@ -1454,6 +1474,9 @@ function buildApiExample() {
 
           <button type="button" class="btn primary" :disabled="!canPrintBatch" @click="handleBatchPrint">
             Stampa serie
+          </button>
+          <button type="button" class="btn danger" :disabled="!selectedPrinter.trim()" @click="handleStop">
+            Ferma stampa
           </button>
         </div>
         </details>

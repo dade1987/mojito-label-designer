@@ -127,3 +127,11 @@ export function printLabel(body) {
     body: JSON.stringify(body),
   })
 }
+
+/** "Ferma stampa": svuota coda e memoria della stampante scelta. */
+export function stopPrinting(printer) {
+  return request('/api/print/stop', {
+    method: 'POST',
+    body: JSON.stringify({ printer }),
+  })
+}
