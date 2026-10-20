@@ -62,6 +62,7 @@ final class ApiHandler
                 $method === 'POST' && $path === '/api/zpl/preview' => $this->handlePreview($this->decodeBody($rawBody)),
                 $method === 'POST' && $path === '/api/label/preview' => $this->handleImagePreview($this->decodeBody($rawBody)),
                 $method === 'POST' && $path === '/api/print' => $this->handlePrint($this->decodeBody($rawBody)),
+                $method === 'POST' && $path === '/api/print/stop' => $this->handleStop($this->decodeBody($rawBody)),
                 default => $this->error(404, 'Endpoint non trovato'),
             };
         } catch (Throwable $exception) {
@@ -250,6 +251,29 @@ final class ApiHandler
         }
 
         return $this->ok($payload);
+    }
+
+    /**
+     * "Ferma stampa": la stampante scelta nel designer, e solo quella.
+     *
+     * @param  array<string, mixed>  $body
+     * @return array{status: int, payload: array<string, mixed>}
+     */
+    private function handleStop(array $body): array
+    {
+        $printer = trim(TypeCaster::string($body['printer'] ?? ''));
+
+        if ($printer === '') {
+            return $this->error(422, 'Scegli la stampante da fermare.');
+        }
+
+        if ($this->destinations !== null && $this->destinations->handles($printer)) {
+            return $this->ok($this->destinations->stop($printer) + ['printer' => $printer]);
+        }
+
+        $this->service->setPrinterName($printer);
+
+        return $this->ok(['status' => 'stopped', 'message' => $this->service->stopPrinting(), 'printer' => $printer]);
     }
 
     /**

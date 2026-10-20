@@ -48,4 +48,14 @@ interface PrintDestinations
      * @return array{status: string} "printed" o "queued"
      */
     public function sendImages(string $printer, array $pngs, LabelMedia $media, int $copies): array;
+
+    /**
+     * Ferma la stampa in corso su questa destinazione ("Ferma stampa"): svuota
+     * quello che si puo' svuotare. `status` e' "stopped" (fatto subito),
+     * "queued" (lo fara' l'agente del PC) o "unsupported"; `message` e' la
+     * frase da mostrare a chi ha premuto il pulsante.
+     *
+     * @return array{status: string, message: string}
+     */
+    public function stop(string $printer): array;
 }

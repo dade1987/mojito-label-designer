@@ -49,6 +49,15 @@ final class PrinterPlatform
     }
 
     /**
+     * Svuota la coda CUPS della stampante. Toglie solo i lavori che l'utente
+     * del server puo' toccare (i suoi), non quelli degli altri.
+     */
+    public static function buildCancelCommand(string $printerName): string
+    {
+        return 'cancel -a '.escapeshellarg($printerName);
+    }
+
+    /**
      * @return list<string>
      */
     public static function buildPrintCommands(string $printerName, string $filePath, string $tempDir = ''): array

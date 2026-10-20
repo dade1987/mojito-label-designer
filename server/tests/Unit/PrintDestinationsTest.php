@@ -80,6 +80,11 @@ final class PrintDestinationsTest extends TestCase
 
                 return ['status' => 'queued'];
             }
+
+            public function stop(string $printer): array
+            {
+                return ['status' => 'stopped', 'message' => ''];
+            }
         };
     }
 
@@ -353,6 +358,11 @@ final class PrintDestinationsTest extends TestCase
             public function send(string $printer, string $zpl, int $labels): array
             {
                 throw new \RuntimeException('Stampante 192.168.1.50:9100 non raggiungibile');
+            }
+
+            public function stop(string $printer): array
+            {
+                throw new \LogicException('non usato');
             }
         };
 

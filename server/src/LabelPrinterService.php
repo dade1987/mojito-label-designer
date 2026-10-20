@@ -25,6 +25,9 @@ final class LabelPrinterService
     /** Oltre questo numero non è più una stampa: è un incidente. */
     public const MAX_COPIES = 1000;
 
+    /** ZPL "cancella tutto": svuota la memoria della stampante, finisce l'etichetta in corso. */
+    public const STOP_ZPL = '~JA';
+
     private string $lastPrintMethod = '';
 
     /** @var list<string> */
@@ -122,6 +125,33 @@ final class LabelPrinterService
         }
 
         return $this->zplBuilder->renderDefaultLabel($data);
+    }
+
+    /**
+     * Ferma la stampa sulla stampante scelta: svuota la coda e, se la
+     * stampante parla ZPL, le manda ~JA, che cancella anche le etichette gia'
+     * nella sua memoria (finisce quella in corso). A una stampante che non si
+     * sa se parla ZPL non si manda: uscirebbe stampato.
+     *
+     * @return string la frase per chi ha premuto "Ferma stampa"
+     */
+    public function stopPrinting(): string
+    {
+        $printer = $this->printerName;
+
+        // Su Windows la coda la svuota l'agente di stampa; qui solo CUPS. Un
+        // errore di "cancel" (coda gia' vuota) non ferma il resto.
+        if (! PrinterPlatform::isWindows()) {
+            $this->commandRunner->run(PrinterPlatform::buildCancelCommand($printer));
+        }
+
+        if (PrinterPrintMode::forPrinter($printer) !== self::MODE_ZPL) {
+            return "Coda di {$printer} svuotata: le etichette già nella memoria della stampante possono ancora uscire.";
+        }
+
+        $this->printZpl(self::STOP_ZPL);
+
+        return "Stop inviato a {$printer}: coda svuotata e memoria della stampante azzerata. Se esce ancora un'etichetta, era già in stampa.";
     }
 
     public function printZpl(string $zpl): void
