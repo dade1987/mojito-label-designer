@@ -1,5 +1,6 @@
 import { cloneTemplateState } from './cloneSerializable.js'
 import { generateId } from './id.js'
+import { normalizeSeriesSettings } from './serialRange.js'
 import {
   buildValuesFromSources,
   ensureElementDataSource,
@@ -32,6 +33,8 @@ export function sanitizeTemplateForSave(template) {
     printSpeed: plain.printSpeed ?? 0,
     originX: plain.originX ?? 0,
     originY: plain.originY ?? 0,
+    // Campi, prefisso e zeri della stampa a serie: non si riscrivono ogni volta.
+    series: normalizeSeriesSettings(plain.series),
     dataSources: (plain.dataSources ?? []).map((source) => ({
       name: source.name,
       label: source.label ?? source.name,

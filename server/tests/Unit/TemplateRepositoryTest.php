@@ -187,6 +187,7 @@ final class TemplateRepositoryTest extends TestCase
             'mediaTracking' => 'mark',
             'darkness' => 22,
             'printSpeed' => 3,
+            'series' => ['codeField' => 'codice_lotto_interno', 'numberField' => 'numero', 'prefix' => 'LOT134ABC20X0826', 'suffix' => '', 'pad' => 0, 'step' => 1],
             'dataSources' => [
                 ['name' => 'codice_lotto_interno', 'label' => 'Codice lotto interno', 'defaultValue' => 'LOT134ABC20X08261'],
                 ['name' => 'numero', 'label' => 'Numero', 'defaultValue' => '999'],
@@ -261,6 +262,46 @@ final class TemplateRepositoryTest extends TestCase
         foreach ($template as $key => $value) {
             $this->assertSame($value, $reloaded[$key] ?? null, "Proprieta' template persa o alterata: {$key}");
         }
+    }
+
+    public function test_data_source_non_in_elenco_diventano_un_elenco_vuoto(): void
+    {
+        $saved = (new TemplateRepository($this->tempDir))->save(['id' => 'x', 'dataSources' => 'rotto', 'elements' => []]);
+
+        $this->assertSame([], $saved['dataSources']);
+    }
+
+    public function test_cartella_non_scrivibile_dice_che_non_ha_salvato(): void
+    {
+        $repository = new TemplateRepository($this->tempDir);
+        chmod($this->tempDir, 0555);
+
+        try {
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('Impossibile salvare il template.');
+            @$repository->save(['id' => 'x', 'dataSources' => [], 'elements' => []]);
+        } finally {
+            chmod($this->tempDir, 0755);
+        }
+    }
+
+    public function test_un_layout_senza_serie_resta_senza_serie(): void
+    {
+        $repository = new TemplateRepository($this->tempDir);
+
+        $saved = $repository->save(['id' => 'vecchio', 'name' => 'Vecchio', 'dataSources' => [], 'elements' => []]);
+
+        $this->assertArrayNotHasKey('series', $saved);
+    }
+
+    public function test_la_serie_si_salva_ripulita(): void
+    {
+        $repository = new TemplateRepository($this->tempDir);
+
+        $saved = $repository->save(['id' => 'serie', 'name' => 'Serie', 'series' => ['codeField' => 'qr_1', 'pad' => 99], 'dataSources' => [], 'elements' => []]);
+
+        $this->assertSame(['codeField' => 'qr_1', 'numberField' => '', 'prefix' => '', 'suffix' => '', 'pad' => 12, 'step' => 1], $repository->find('serie')['series']);
+        $this->assertSame($saved['series'], $repository->find('serie')['series']);
     }
 
     public function test_it_remembers_how_the_layout_must_be_printed(): void

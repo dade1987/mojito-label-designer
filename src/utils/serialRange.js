@@ -95,6 +95,62 @@ export function buildPrintJobs(serials, dataSource) {
 }
 
 /**
+ * Etichette piccole: il codice o il QR portano il codice completo del pacco
+ * (prefisso + numero + suffisso, es. CTW10140T20S0926111), un secondo campo
+ * facoltativo solo il numero (111) da leggere a occhio.
+ */
+export function buildSeriesJobs(range, { codeField, numberField = '' } = {}) {
+  const code = String(codeField ?? '').trim()
+  const number = String(numberField ?? '').trim()
+
+  if (code === '') {
+    throw new Error('Scegli la sorgente dati che riceve il numero di serie.')
+  }
+
+  if (number === code) {
+    throw new Error('Il codice completo e il solo numero vanno in due campi diversi.')
+  }
+
+  const { prefix = '', suffix = '' } = range
+  const numbers = buildSerialRange({ ...range, prefix: '', suffix: '' })
+
+  return numbers.map((value) => ({
+    [code]: `${prefix ?? ''}${value}${suffix ?? ''}`,
+    ...(number === '' ? {} : { [number]: value }),
+  }))
+}
+
+const MAX_PAD = 12
+
+function wholeNumberOr(value, fallback) {
+  const parsed = Number(value)
+
+  return value !== null && value !== '' && Number.isInteger(parsed) ? parsed : fallback
+}
+
+function textOr(value) {
+  return typeof value === 'string' ? value : ''
+}
+
+/**
+ * Le impostazioni della serie salvate nel layout (campi, prefisso, zeri,
+ * passo): Da, A e copie cambiano a ogni stampa e non si salvano.
+ */
+export function normalizeSeriesSettings(raw = {}) {
+  const source = raw !== null && typeof raw === 'object' ? raw : {}
+  const step = wholeNumberOr(source.step, 1)
+
+  return {
+    codeField: textOr(source.codeField),
+    numberField: textOr(source.numberField),
+    prefix: textOr(source.prefix),
+    suffix: textOr(source.suffix),
+    pad: Math.min(MAX_PAD, Math.max(0, wholeNumberOr(source.pad, 0))),
+    step: step >= 1 ? step : 1,
+  }
+}
+
+/**
  * Il riepilogo che l'operatore legge prima di premere Stampa.
  */
 export function describeRun(labels, copies) {

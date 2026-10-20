@@ -91,7 +91,7 @@ Key classes in `server/src/`:
 
 When printing, the request either carries a `templateId` (server resolves it via `TemplateRepository`), an inline `template`, or a raw pre-built `zpl` string. `POST /api/print` also accepts `copies` (repeat the same label) and `jobs` (a list of per-label value maps — one label per entry, used by the designer's manual serial-range printing); `POST /api/label/preview` returns the drawn label as a base64 PNG. The whole run is capped at `LabelPrinterService::MAX_COPIES` labels.
 
-Serial ranges live in `src/utils/serialRange.js` (pure, 100% covered): `buildSerialRange({prefix, start, end, step, pad, suffix})` produces the numbers, `buildPrintJobs()` turns them into the `jobs` payload.
+Serial ranges live in `src/utils/serialRange.js` (pure, 100% covered): `buildSerialRange({prefix, start, end, step, pad, suffix})` produces the numbers, `buildSeriesJobs(range, {codeField, numberField})` turns them into the `jobs` payload — the full code (prefix + number + suffix) into `codeField` and, optionally, the bare number into `numberField` (small labels: QR `CTW10140T20S0926111`, visible text `111`). Those settings (fields, prefix, suffix, pad, step) are saved with the layout as `template.series`, normalized by `normalizeSeriesSettings()` in the designer and `SerialSeriesSettings::sanitize()` on the server; only from/to/copies change per run.
 
 ### Frontend/backend integration when embedded in the host app
 

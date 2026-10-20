@@ -43,6 +43,20 @@ describe('layoutStorage', () => {
     expect(saved.originY).toBe(0)
   })
 
+  it('sanitizeTemplateForSave conserva le impostazioni della serie, ripulite', () => {
+    const saved = sanitizeTemplateForSave({
+      id: 't-serie',
+      series: { codeField: 'qr_1', numberField: 'text_1', prefix: 'CTW10140T20S0926', pad: 99 },
+      dataSources: [],
+      elements: [],
+    })
+
+    expect(saved.series).toEqual({ codeField: 'qr_1', numberField: 'text_1', prefix: 'CTW10140T20S0926', suffix: '', pad: 12, step: 1 })
+    expect(sanitizeTemplateForSave({ id: 't', dataSources: [], elements: [] }).series).toEqual({
+      codeField: '', numberField: '', prefix: '', suffix: '', pad: 0, step: 1,
+    })
+  })
+
   it('sanitizeTemplateForSave conserva offset origine', () => {
     const saved = sanitizeTemplateForSave({
       id: 't2',
@@ -101,6 +115,7 @@ describe('layoutStorage', () => {
       darkness: 22,
       printSpeed: 3,
       printMode: 'graphic',
+      series: { codeField: 'qr_1', numberField: 'text_1', prefix: 'CTW10140T20S0926', suffix: '', pad: 0, step: 1 },
       dataSources: [
         { name: 'codice_lotto_interno', label: 'Codice lotto interno', defaultValue: 'LOT134ABC20X08261' },
         { name: 'numero', label: 'Numero', defaultValue: '999' },
@@ -278,6 +293,22 @@ describe('layoutStorage', () => {
     expect(() => parseLayoutJsonText('{')).toThrow('JSON non valido')
     expect(() => parseLayoutJsonText('[]')).toThrow('oggetto JSON')
     expect(() => parseLayoutJsonText('{"id":"x"}')).toThrow('manca elements')
+  })
+
+  it('parseLayoutJsonText rifiuta un testo vuoto', () => {
+    expect(() => parseLayoutJsonText('   ')).toThrow('JSON vuoto.')
+  })
+
+  it('removeDataSource toglie il valore fisso rimasto sull\'elemento', () => {
+    const template = {
+      dataSources: [{ name: 'foto', label: 'Foto', defaultValue: '' }],
+      elements: [{ id: 'i1', type: 'image', dataSource: 'foto', staticValue: 'vecchio' }],
+    }
+
+    const next = removeDataSource(template, 'foto')
+
+    expect(next.elements[0]).not.toHaveProperty('staticValue')
+    expect(next.elements[0].dataSource).toBe('')
   })
 
   it('removeDataSource e isDataSourceInUse', () => {

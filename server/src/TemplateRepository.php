@@ -140,7 +140,7 @@ final class TemplateRepository
             $dataSourcesInput = [];
         }
 
-        return [
+        $sanitized = [
             'id' => $id,
             'name' => TypeCaster::string($template['name'] ?? 'Etichetta senza nome', 'Etichetta senza nome'),
             'labelWidth' => TypeCaster::int($template['labelWidth'] ?? 600, 600),
@@ -175,6 +175,14 @@ final class TemplateRepository
             }, $dataSourcesInput),
             'elements' => $template['elements'],
         ];
+
+        // Campi, prefisso e zeri della stampa a serie: si salvano col layout
+        // per non riscriverli a ogni stampa. I layout vecchi restano senza.
+        if (array_key_exists('series', $template)) {
+            $sanitized['series'] = SerialSeriesSettings::sanitize($template['series']);
+        }
+
+        return $sanitized;
     }
 
     /**
